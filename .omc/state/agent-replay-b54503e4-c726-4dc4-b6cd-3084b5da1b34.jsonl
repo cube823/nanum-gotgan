@@ -74,3 +74,14 @@
 {"t":0,"agent":"system","event":"keyword_detected","keyword":"autopilot"}
 {"t":0,"agent":"system","event":"mode_change","mode_from":"none","mode_to":"autopilot"}
 {"t":0,"agent":"system","event":"skill_invoked","skill_name":"oh-my-claudecode:autopilot"}
+{"t":0,"agent":"a66612d","agent_type":"security-reviewer","event":"agent_start","parent_mode":"autopilot"}
+{"t":0,"agent":"a66612d","agent_type":"security-reviewer","event":"agent_stop","success":true,"duration_ms":17563}
+{"t":0,"agent":"a66612d","agent_type":"security-reviewer","event":"agent_stop","success":true,"duration_ms":19545}
+{"t":0,"agent":"a66612d","agent_type":"security-reviewer","event":"agent_stop","success":true,"duration_ms":21372}
+{"t":0,"agent":"a66612d","agent_type":"security-reviewer","event":"agent_stop","success":true,"duration_ms":23468}
+{"t":0,"agent":"a66612d","agent_type":"security-reviewer","event":"agent_stop","success":true,"duration_ms":25365}
+{"t":0,"agent":"a66612d","agent_type":"security-reviewer","event":"agent_stop","success":true,"duration_ms":27123}
+{"t":0,"agent":"a66612d","agent_type":"security-reviewer","event":"agent_stop","success":true,"duration_ms":28856}
+{"t":0,"agent":"a66612d","agent_type":"security-reviewer","event":"agent_stop","success":true,"duration_ms":30615}
+{"t":0,"agent":"a32f354","agent_type":"unknown","event":"agent_stop","success":true}
+{"t":0,"agent":"a66612d","agent_type":"security-reviewer","event":"agent_stop","success":true,"duration_ms":32555}

@@ -27,11 +27,10 @@ export const PATCH = api(async (req) => {
   const { userId, action } = await req.json();
   if (!["approve", "reject"].includes(action)) throw new HttpError(400, "action이 올바르지 않아요.");
 
-  const [target] = await sql`SELECT id, org_id FROM users WHERE id = ${userId} AND org_status = 'pending'`;
-  if (!target) throw new HttpError(404, "대기 중인 사용자가 아니에요.");
-  if (orgId && target.orgId !== orgId) throw new HttpError(403, "우리 기관 사용자만 승인할 수 있어요.");
-
   await sql.begin(async (tx) => {
+    const [target] = await tx`SELECT id, org_id FROM users WHERE id = ${userId} AND org_status = 'pending' FOR UPDATE`;
+    if (!target) throw new HttpError(404, "대기 중인 사용자가 아니에요.");
+    if (orgId && target.orgId !== orgId) throw new HttpError(403, "우리 기관 사용자만 승인할 수 있어요.");
     await tx`UPDATE users
       SET org_status = ${action === "approve" ? "verified" : "rejected"},
           verified_by = ${u.id}, verified_at = now()

@@ -110,14 +110,35 @@ expect "items completed" "completed" "$(api "$B" GET "/api/items/$ITEM" | body |
 expect "완료된 물품 신청 400" "400" "$(api "$B" POST /api/transfers "$SW" | status)"
 expect "완료 후 목록에서 사라짐" "False" "$(api "$B" GET "/api/items?mode=list" | body | has $ITEM)"
 
+echo "7b. 동시 예약 경합 — 둘 중 하나만 성공해야 한다 (FOR UPDATE)"
+R=$(api "$A" POST /api/items "$ITEM_JSON"); ITEM3=$(echo "$R" | body | jget id)
+SW3="{\"itemId\":\"$ITEM3\"}"
+login "$ADM" "admin@dev.local" "운영자"   # 운영자에게도 소속을 줘서 신청자 C 역할
+C=$J/c; login "$C" "c$SUF@dev.local" "기관C 담당자"
+api "$C" POST /api/orgs "{\"name\":\"테스트 청년센터 C$SUF\",\"orgType\":\"직영\"}" >/dev/null
+cuid=$(api "$C" GET /api/me | body | jget id); APPROVE_C="{\"userId\":\"$cuid\",\"action\":\"approve\"}"
+api "$ADM" PATCH /api/admin/approvals "$APPROVE_C" >/dev/null
+login "$C" "c$SUF@dev.local" "기관C 담당자"
+TB=$(api "$B" POST /api/transfers "$SW3" | body | jget id)
+TC=$(api "$C" POST /api/transfers "$SW3" | body | jget id)
+( api "$A" PATCH "/api/transfers/$TB" '{"action":"schedule"}' | status > "$J/r1" ) &
+( api "$A" PATCH "/api/transfers/$TC" '{"action":"schedule"}' | status > "$J/r2" ) &
+wait
+WINS=$( { cat "$J/r1"; echo; cat "$J/r2"; echo; } | grep -c '^200$' || true)
+expect "동시 schedule 2건 중 성공은 정확히 1" "1" "$WINS"
+expect "물품은 reserved" "reserved" "$(api "$B" GET "/api/items/$ITEM3" | body | jget status)"
+
 echo "8. 내리기"
 R=$(api "$A" POST /api/items "$ITEM_JSON"); ITEM2=$(echo "$R" | body | jget id)
 SW2="{\"itemId\":\"$ITEM2\"}"
 T3=$(api "$B" POST /api/transfers "$SW2" | body | jget id)
 expect "B가 내리기 403" "403" "$(api "$B" PATCH "/api/items/$ITEM2" '{"action":"withdraw"}' | status)"
 expect "A 내리기 200" "200" "$(api "$A" PATCH "/api/items/$ITEM2" '{"action":"withdraw"}' | status)"
-expect "withdrawn" "withdrawn" "$(api "$A" GET "/api/items/$ITEM2" | body | jget status)"
-expect "대화 종료됨(메시지 전송 여전히 가능하나 방은 cancelled)" "200" "$(api "$B" GET "/api/transfers/$T3/messages" | status)"
+expect "내린 물품은 API로도 404" "404" "$(api "$A" GET "/api/items/$ITEM2" | status)"
+expect "내린 물품은 내 등록 목록에서도 빠짐" "False" "$(api "$A" GET "/api/items?mode=list" | body | has $ITEM2)"
+expect "종료된 방 이력 조회는 200" "200" "$(api "$B" GET "/api/transfers/$T3/messages" | status)"
+expect "종료된 방에 새 메시지는 400" "400" "$(api "$B" POST "/api/transfers/$T3/messages" '{"body":"아직 되나요"}' | status)"
+expect "완료된 방에 새 메시지도 400" "400" "$(api "$B" POST "/api/transfers/$T/messages" '{"body":"감사합니다"}' | status)"
 expect "완료된 물품 내리기 400" "400" "$(api "$A" PATCH "/api/items/$ITEM" '{"action":"withdraw"}' | status)"
 
 echo "9. 페이지 렌더 (200)"

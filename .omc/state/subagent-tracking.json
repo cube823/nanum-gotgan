@@ -1,7 +1,17 @@
 {
-  "agents": [],
-  "total_spawned": 0,
-  "total_completed": 0,
+  "agents": [
+    {
+      "agent_id": "a66612d33de73a666",
+      "agent_type": "oh-my-claudecode:security-reviewer",
+      "started_at": "2026-09-08T07:07:03.249Z",
+      "parent_mode": "autopilot",
+      "status": "completed",
+      "completed_at": "2026-09-08T07:07:35.804Z",
+      "duration_ms": 32555
+    }
+  ],
+  "total_spawned": 1,
+  "total_completed": 9,
   "total_failed": 0,
-  "last_updated": "2026-09-08T04:48:07.856Z"
+  "last_updated": "2026-09-08T07:07:35.907Z"
 }

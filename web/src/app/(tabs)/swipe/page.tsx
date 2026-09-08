@@ -11,6 +11,7 @@ import type { ItemCard } from "@/lib/types";
 export default function SwipePage() {
   const [cards, setCards] = useState<ItemCard[] | null>(null);
   const [idx, setIdx] = useState(0);
+  const [photoIdx, setPhotoIdx] = useState(0);   // 02: 사진 우측 터치 = 다음 사진, 좌측 = 이전 사진
   const touch = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
@@ -20,8 +21,16 @@ export default function SwipePage() {
   const mark = (id: string) =>
     fetch("/api/swipes", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ itemId: id }) }).catch(() => {});
 
-  const next = () => { if (!cards) return; if (idx < cards.length) mark(cards[idx].id); setIdx((i) => Math.min(i + 1, cards.length)); };
-  const prev = () => setIdx((i) => Math.max(i - 1, 0));
+  const next = () => { if (!cards) return; if (idx < cards.length) mark(cards[idx].id); setIdx((i) => Math.min(i + 1, cards.length)); setPhotoIdx(0); };
+  const prev = () => { setIdx((i) => Math.max(i - 1, 0)); setPhotoIdx(0); };
+  // 탭(스와이프 아님)이 카드 좌/우 절반 중 어디에 떨어졌는지로 사진을 넘긴다.
+  const onPhotoTap = (e: React.MouseEvent<HTMLDivElement>) => {
+    const n = cards?.[idx]?.photos.length ?? 0;
+    if (n < 2) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    const right = e.clientX - r.left > r.width / 2;
+    setPhotoIdx((p) => (right ? Math.min(p + 1, n - 1) : Math.max(p - 1, 0)));
+  };
 
   const onStart = (e: React.TouchEvent) => { touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; };
   const onEnd = (e: React.TouchEvent) => {
@@ -56,9 +65,16 @@ export default function SwipePage() {
 
         {card && (
           <>
-            <div className="relative flex-1 rounded-2xl overflow-hidden bg-neutral-100 min-h-[420px]">
+            <div className="relative flex-1 rounded-2xl overflow-hidden bg-neutral-100 min-h-[420px]" onClick={onPhotoTap}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              {card.photos[0] && <img src={card.photos[0]} alt={card.name} className="absolute inset-0 size-full object-cover" />}
+              {card.photos[photoIdx] && <img src={card.photos[photoIdx]} alt={card.name} className="absolute inset-0 size-full object-cover" />}
+              {card.photos.length > 1 && (
+                <div className="absolute top-3 inset-x-3 flex gap-1">
+                  {card.photos.map((_, i) => (
+                    <span key={i} className={`h-0.5 flex-1 rounded-full ${i === photoIdx ? "bg-white" : "bg-white/40"}`} />
+                  ))}
+                </div>
+              )}
               <div className="absolute inset-x-0 bottom-0 p-5 bg-gradient-to-t from-black/70 to-transparent text-white">
                 <span className="chip bg-white/20 backdrop-blur">{card.categoryLabel}</span>
                 <p className="mt-2 text-2xl font-bold">{card.name}</p>

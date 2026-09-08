@@ -34,7 +34,7 @@ export async function getItem(id: string): Promise<ItemCard | null> {
   const [row] = await sql<ItemCard[]>`
     SELECT ${CARD}
     FROM items i JOIN organizations o ON o.id = i.org_id JOIN categories c ON c.code = i.category
-    WHERE i.id = ${id}`;
+    WHERE i.id = ${id} AND i.status <> 'withdrawn'`;   // 내린 물품은 API로도 안 보인다
   return row ?? null;
 }
 

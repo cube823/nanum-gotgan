@@ -19,7 +19,7 @@ export default function PendingPage() {
       const me = await r.json();
       setOrg(me.org?.name ?? null);
       setStatus(me.orgStatus);
-      if (me.orgStatus === "verified") { await update(); router.replace("/swipe"); }
+      if (me.orgStatus === "verified") { await update(); router.push("/swipe"); }
     };
     tick();
     const id = setInterval(tick, 5000);
@@ -41,7 +41,7 @@ export default function PendingPage() {
         </p>
       </div>
       <div className="space-y-2">
-        <button onClick={() => router.push("/swipe")} className="btn-brand w-full">물품 둘러보기</button>
+        <a href="/swipe" className="btn-brand w-full">물품 둘러보기</a>
         <button onClick={() => signOut({ callbackUrl: "/login" })} className="btn-ghost w-full">로그아웃</button>
       </div>
     </main>

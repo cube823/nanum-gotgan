@@ -31,7 +31,7 @@ export default function OnboardingPage() {
     const j = await r.json();
     if (!r.ok) { setError(j.error); setBusy(false); return; }
     await update();               // JWT에 org_id 싣기 — 그래야 proxy가 통과시킨다
-    router.replace("/pending");
+    router.push("/pending");      // update()가 새 쿠키를 받은 뒤라 다음 요청부터 proxy가 org를 본다
   }
 
   return (

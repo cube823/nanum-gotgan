@@ -1,6 +1,8 @@
 # 나눔곳간
 
-서울시 청년공간·센터끼리 남는 소모품을 나누는 서비스. 설계는 `MVP.md`, `DB-SCHEMA.md`.
+서울시 청년공간·센터끼리 남는 소모품을 나누는 서비스.
+
+**문서**: AI는 `AGENTS.md`에서, 사람은 `docs/README.md`에서 시작한다. 설계 원본은 `docs/design/`.
 
 ## 구조 — pnpm 워크스페이스
 
@@ -12,6 +14,7 @@ sharing-space/
   web/                  ← @nanum/web  — Next.js 앱 (MVP 본체)
   ai/                   ← @nanum/ai   — 사진→게시글 초안 (MVP 밖, 나중에 web이 import)
   db/                   ← schema.sql, seed.sql (패키지 아님 — psql로 직접 적용)
+  docs/                 ← 사람용 문서: 용어·아키텍처·피처·결정·가이드
 ```
 
 ## 처음 한 번

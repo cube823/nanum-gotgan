@@ -1,6 +1,6 @@
 # ai/ — 사진 → 게시글 초안
 
-`AI-LOOP-DESIGN.md` §2의 `[2] GROUP → [3] EXTRACT → [4] GUARD`를 구현한 것.
+`../docs/design/AI-LOOP-DESIGN.md` §2의 `[2] GROUP → [3] EXTRACT → [4] GUARD`를 구현한 것.
 `[5] REVIEW`(사람)와 `[6] COMMIT`(DB)은 여기 없다.
 
 ```
@@ -23,7 +23,7 @@ node ai/try.js ai/fixtures/*.jpg       # 실제 API 호출 (비용 발생)
 
 ## 골든셋
 
-`ai/fixtures/`에 사진을 넣는다. `AI-LOOP-DESIGN.md` §6-2대로 20장,
+`ai/fixtures/`에 사진을 넣는다. `../docs/design/AI-LOOP-DESIGN.md` §6-2대로 20장,
 **문구류·포장재·전기류를 섞어서.** 전기류가 특히 중요하다 — 🔴로 안 잡히면
 법적 방어선이 뚫린 것이다.
 

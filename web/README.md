@@ -1,6 +1,6 @@
 # 나눔곳간 — web
 
-Next.js 16 (App Router) + PostgreSQL. 설계는 상위 폴더의 `MVP.md`, `DB-SCHEMA.md`.
+Next.js 16 (App Router) + PostgreSQL. 설계는 `../docs/design/MVP.md`, `../docs/design/DB-SCHEMA.md`. 이 패키지 규칙은 `AGENTS.md`.
 
 ## 처음 한 번
 

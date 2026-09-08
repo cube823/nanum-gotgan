@@ -1,4 +1,8 @@
 node_modules/
 .env
+.env.local
+.next/
+web/public/uploads/
 ai/fixtures/*
 !ai/fixtures/.gitkeep
+.omc/

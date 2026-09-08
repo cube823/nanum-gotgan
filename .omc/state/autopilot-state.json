@@ -1,15 +1,14 @@
 {
   "active": true,
-  "iteration": 1,
-  "max_iterations": 10,
-  "current_phase": "execution",
-  "task_description": "나눔곳간 MVP: MVP.md §6 순서. Next.js + Postgres in web/. Phase 0/1 skipped — MVP.md + DB-SCHEMA.md are the reviewed spec.",
-  "plan_path": "MVP.md",
-  "started_at": "2026-09-08T14:00:00+09:00",
+  "iteration": 2,
+  "current_phase": "validation",
+  "qa": "smoke 51/51, tsc 0, eslint 0",
+  "screens": "13",
+  "api_routes": "12",
   "_meta": {
     "mode": "autopilot",
     "sessionId": null,
-    "updatedAt": "2026-09-08T06:47:49.352Z",
+    "updatedAt": "2026-09-08T07:03:53.455Z",
     "updatedBy": "state_write_tool"
   }
 }

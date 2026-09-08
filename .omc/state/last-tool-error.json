@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"echo \\\"--- postgres ---\\\"; which psql pg_isready 2>/dev/null; pg_isready 2>&1; brew services list 2>/dev/null | grep -i postgres; echo \\\"--- docker ---\\\"; which docker && docker ps --forma...",
+  "error": "Exit code 128\n--- postgres ---\n/opt/homebrew/bin/psql\n/opt/homebrew/bin/pg_isready\n/tmp:5432 - accepting connections\npostgresql@14 started         mingiyoon ~/Library/LaunchAgents/homebrew.mxcl.postgresql@14.plist\n--- docker ---\n/usr/local/bin/docker\nCannot connect to the Docker daemon at unix:///Users/mingiyoon/.docker/run/docker.sock. Is the docker daemon running?\n--- pkg mgr ---\n/opt/homebrew/bin/pnpm\n/Users/mingiyoon/.bun/bin/bun\n--- git ---\nfatal: not a git repository (or any of the parent ...",
+  "timestamp": "2026-09-08T06:47:53.414Z",
+  "retry_count": 1
+}

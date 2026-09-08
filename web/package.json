@@ -1,12 +1,14 @@
 {
-  "name": "web",
+  "name": "@nanum/web",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint src --max-warnings=0",
+    "smoke": "bash scripts/smoke.sh",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "next": "16.3.4",

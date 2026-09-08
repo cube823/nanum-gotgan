@@ -1,17 +1,13 @@
 {
-  "name": "nanum-gotgan-ai",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "name": "nanum-gotgan",
+  "private": true,
+  "packageManager": "pnpm@11.7.0",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "module",
-  "dependencies": {
-    "@anthropic-ai/sdk": "^0.124.0",
-    "zod": "^4.5.4"
+    "dev": "pnpm --filter @nanum/web dev",
+    "build": "pnpm --filter @nanum/web build",
+    "test": "pnpm -r test",
+    "lint": "pnpm --filter @nanum/web lint",
+    "typecheck": "pnpm --filter @nanum/web typecheck",
+    "smoke": "pnpm --filter @nanum/web smoke"
   }
 }

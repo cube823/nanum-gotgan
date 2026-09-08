@@ -14,9 +14,9 @@ psql -d nanum_gotgan -f ../db/seed.sql        # 카테고리 10개
 cp .env.example .env.local                     # DATABASE_URL, AUTH_SECRET 채우기
 #   ADMIN_EMAILS 에 운영자 이메일을 넣으면 그 이메일로 로그인 시 승인 권한이 생긴다
 
-# 3. 실행
-pnpm install
-pnpm dev                                       # http://localhost:3000
+# 3. 실행 — 설치는 리포 루트에서 (pnpm 워크스페이스)
+cd .. && pnpm install && cd web
+pnpm dev                                       # http://localhost:3000  (루트에서 `pnpm dev`도 같다)
 ```
 
 개발 중엔 OAuth 클라이언트 ID 없이 **개발용 로그인**(이메일만 입력)으로 전체 흐름을 돌릴 수 있다.
@@ -25,9 +25,9 @@ pnpm dev                                       # http://localhost:3000
 ## 확인
 
 ```bash
-bash scripts/smoke.sh          # dev 서버 떠 있을 때. 계정 3개로 한 바퀴 (51건)
-pnpm exec tsc --noEmit
-pnpm exec eslint src
+pnpm smoke                     # dev 서버 떠 있을 때. 계정 3개로 한 바퀴 (56건)
+pnpm typecheck
+pnpm lint
 pnpm build
 ```
 

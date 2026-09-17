@@ -1,17 +1,21 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import { put } from "@vercel/blob";
 
-// ponytail: 로컬 파일 저장. 프로덕션은 Vercel Blob/S3로 — 이 함수 하나만 바꾸면 된다 (MVP §7-1).
-// public/은 dev에서 런타임 추가 파일도 서빙되지만, 프로덕션 빌드에선 빌드 시점 스냅샷이다.
-const DIR = path.join(process.cwd(), "public", "uploads");
+/**
+ * 사진 저장. 프로덕션(Vercel)은 Blob, 로컬은 public/uploads.
+ * 분기 기준은 BLOB_READ_WRITE_TOKEN 유무 — Vercel이 Blob 스토어를 연결하면 자동으로 들어온다.
+ * 호출하는 쪽은 이 차이를 모른다. url 문자열 하나만 받는다.
+ */
 const MAX = 10 * 1024 * 1024;
+const LOCAL_DIR = path.join(process.cwd(), "public", "uploads");
 
 /** 매직 바이트로 판별한다. 클라이언트가 보낸 file.type은 믿지 않는다. */
-function sniff(b: Buffer): "jpg" | "png" | "webp" | null {
-  if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return "jpg";
-  if (b.length >= 8 && b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return "png";
-  if (b.length >= 12 && b.subarray(0, 4).toString("ascii") === "RIFF" && b.subarray(8, 12).toString("ascii") === "WEBP") return "webp";
+function sniff(b: Buffer): { ext: "jpg" | "png" | "webp"; mime: string } | null {
+  if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return { ext: "jpg", mime: "image/jpeg" };
+  if (b.length >= 8 && b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return { ext: "png", mime: "image/png" };
+  if (b.length >= 12 && b.subarray(0, 4).toString("ascii") === "RIFF" && b.subarray(8, 12).toString("ascii") === "WEBP") return { ext: "webp", mime: "image/webp" };
   return null;
 }
 
@@ -19,10 +23,22 @@ export async function putImage(file: File): Promise<string> {
   if (file.size === 0) throw new Error("빈 파일이에요.");
   if (file.size > MAX) throw new Error("10MB 이하만 올릴 수 있어요.");
   const buf = Buffer.from(await file.arrayBuffer());
-  const ext = sniff(buf);
-  if (!ext) throw new Error("JPG·PNG·WebP 이미지만 올릴 수 있어요.");
-  await mkdir(DIR, { recursive: true });
-  const name = `${randomUUID()}.${ext}`;
-  await writeFile(path.join(DIR, name), buf);
+  const kind = sniff(buf);
+  if (!kind) throw new Error("JPG·PNG·WebP 이미지만 올릴 수 있어요.");
+  const name = `${randomUUID()}.${kind.ext}`;
+
+  if (process.env.BLOB_READ_WRITE_TOKEN) {
+    const blob = await put(`items/${name}`, buf, {
+      access: "public",
+      contentType: kind.mime,
+      addRandomSuffix: false,          // 이름이 이미 uuid라 충돌 없음
+      cacheControlMaxAge: 60 * 60 * 24 * 365,
+    });
+    return blob.url;
+  }
+
+  // ponytail: 로컬 개발 폴백. 프로덕션 빌드에선 public/이 빌드 시점 스냅샷이라 여기로 오면 안 된다.
+  await mkdir(LOCAL_DIR, { recursive: true });
+  await writeFile(path.join(LOCAL_DIR, name), buf);
   return `/uploads/${name}`;
 }

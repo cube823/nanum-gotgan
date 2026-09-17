@@ -33,6 +33,6 @@
 
 ## 열린 것
 
-- 사진이 `public/uploads`에 저장된다 — **프로덕션 빌드에서 안 보인다.** 배포 전 `putImage` 교체.
+- ~~사진이 `public/uploads`에 저장된다~~ — 해소. `BLOB_READ_WRITE_TOKEN`이 있으면 Vercel Blob (`guides/deploy.md`).
 - 등록 전에 업로드된 사진은 중간에 나가면 고아가 된다. 초기엔 무시.
 - `quantity_unit` 자유 텍스트. 실제 값을 보고 enum으로 조일지 결정.

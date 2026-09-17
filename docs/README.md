@@ -9,6 +9,7 @@
 | [features/](features/) | 피처별: 기획서 번호 ↔ 화면 ↔ 파일 ↔ smoke 단계 ↔ 열린 것 |
 | [decisions/](decisions/) | 왜 그렇게 정했는지. 뒤집을 때도 여기에 새 번호로 |
 | [guides/adding-a-feature.md](guides/adding-a-feature.md) | 기능을 넣을 때 순서와 체크리스트 |
+| [guides/deploy.md](guides/deploy.md) | Vercel + Neon + Blob + nanumgotgan.com — 순서와 OAuth URI 갱신 |
 | [design/](design/) | 원본 설계 — `MVP.md`(범위·플로우), `DB-SCHEMA.md`(스키마·상태표), `AI-LOOP-DESIGN.md` |
 
 ## 규칙

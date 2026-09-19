@@ -6,3 +6,6 @@ web/public/uploads/
 ai/fixtures/*
 !ai/fixtures/.gitkeep
 .omc/
+.vercel
+.env*
+!.env.example

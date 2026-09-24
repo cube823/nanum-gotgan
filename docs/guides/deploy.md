@@ -12,6 +12,14 @@ DNS 전파를 기다리는 동안 다른 게 막히지 않는다.
 gh repo create nanum-gotgan --private --source=. --push   # cube823 계정, 프라이빗
 ```
 
+- **커밋 작성자 이메일을 Vercel 계정과 맞춘다.** GitHub를 연결하면 Vercel이 커밋 작성자를
+  좌석과 대조해, 모르는 주소면 배포를 `BLOCKED`(`COMMIT_AUTHOR_REQUIRED`)로 막는다.
+  회사 메일이 글로벌 설정이면 이 레포만 덮어쓴다:
+
+```bash
+git config --local user.email cube823@gmail.com   # Vercel 로그인 계정과 동일하게
+```
+
 ## 1. Vercel 프로젝트
 
 1. https://vercel.com/new → GitHub `nanum-gotgan` Import
@@ -36,6 +44,12 @@ gh repo create nanum-gotgan --private --source=. --push   # cube823 계정, 프�
 - **Neon** (Postgres) → Create → 연결. `DATABASE_URL`이 env에 자동 추가된다.
 - **Blob** → Create → 연결. `BLOB_READ_WRITE_TOKEN` 자동 추가.
 
+> ⚠️ Neon 연결 시 Vercel이 변수에 **`<스토어이름>_` 접두사**를 붙이는 경우가 있다
+> (`nanum_gotgan_DATABASE_URL`). 코드(`web/src/lib/db.ts`)는 `DATABASE_URL`을 읽으므로
+> 이름이 어긋나면 DB에 못 붙는다. `vercel env ls production`으로 확인하고, 접두사가 붙었으면
+> 같은 값을 `DATABASE_URL`로도 넣는다. Neon 값은 `sensitive` 타입이라 CLI·API로 되읽을 수 없으니
+> Neon 콘솔에서 연결 문자열을 직접 복사한다.
+
 스키마 적용 — Neon 대시보드의 연결 문자열로:
 
 ```bash
@@ -48,8 +62,11 @@ Redeploy → `https://<프로젝트>.vercel.app/login`이 뜨면 됨.
 
 로컬 URI는 **지우지 말고 추가**한다. 로컬 개발은 계속 쓴다.
 
-- 구글 콘솔 → OAuth 클라이언트 → 승인된 리디렉션 URI: `https://<프로젝트>.vercel.app/api/auth/callback/google`
-- 카카오 콘솔 → REST API 키 수정 → 리다이렉트 URI: `https://<프로젝트>.vercel.app/api/auth/callback/kakao`
+**배포마다 바뀌는 긴 URL(`nanum-gotgan-<해시>-...`)이 아니라 고정 URL `nanum-gotgan.vercel.app`을
+등록한다.** 해시 URL을 넣으면 다음 배포에서 로그인이 깨진다.
+
+- 구글 콘솔 → OAuth 클라이언트 → 승인된 리디렉션 URI: `https://nanum-gotgan.vercel.app/api/auth/callback/google`
+- 카카오 콘솔 → REST API 키 수정 → 리다이렉트 URI: `https://nanum-gotgan.vercel.app/api/auth/callback/kakao`
 - 구글 동의 화면이 "테스트" 상태면 **테스트 사용자**에 팀·인터뷰 대상 이메일 추가. 아니면 "게시"(심사 없음, "확인되지 않은 앱" 경고만)
 
 여기서 실제 로그인이 되는지 본다. 되면 도메인.

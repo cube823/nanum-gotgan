@@ -144,3 +144,15 @@ CREATE TABLE swipes (
   created_at  timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (user_id, item_id)
 );
+
+-- ─── 관심 자원 키워드 ───────────────────────────────────────────────────────
+-- 가입 때 4개 이상 고른다 (기획 정의서 STEP 3). 스와이프 피드 정렬에 쓴다.
+-- 🔴 카테고리는 추천 대상이 아니다 — 등록은 승인 확인을 거쳐 가능하지만,
+-- "관심 자원"으로 먼저 들이밀지는 않는다.
+
+CREATE TABLE user_interests (
+  user_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  category    text NOT NULL REFERENCES categories(code),
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, category)
+);

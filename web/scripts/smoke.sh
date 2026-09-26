@@ -32,6 +32,7 @@ body()   { sed '$d'; }
 jget()   { python3 -c "import sys,json; print(json.load(sys.stdin)['$1'])"; }
 has()    { python3 -c "import sys,json; print(any(i['id']=='$1' for i in json.load(sys.stdin)))"; }
 count()  { python3 -c "import sys,json; print(len(json.load(sys.stdin)))"; }
+first()  { python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0]['id'] if d else '')"; }
 
 A=$J/a B=$J/b ADM=$J/adm
 SUF=$RANDOM
@@ -51,6 +52,19 @@ expect "A manager"  "manager" "$(api "$A" GET /api/me | body | jget orgRole)"
 DUP="{\"name\":\"테스트청년센터A$SUF\",\"orgType\":\"직영\"}"
 expect "중복 기관명 409" "409" "$(api "$B" POST /api/orgs "$DUP" | status)"
 expect "pending은 등록 403" "403" "$(api "$A" POST /api/items '{}' | status)"
+
+echo "2b. 관심 자원 — 기획 정의서 STEP 3 (4개 이상, 🔴 제외)"
+FOUR='{"categories":["stationery","packaging","craft","disposable"]}'
+expect "3개는 400"        "400" "$(api "$A" PUT /api/me/interests '{"categories":["stationery","packaging","craft"]}' | status)"
+expect "🔴 섞이면 400"    "400" "$(api "$A" PUT /api/me/interests '{"categories":["stationery","packaging","craft","electronics"]}' | status)"
+expect "없는 코드 400"    "400" "$(api "$A" PUT /api/me/interests '{"categories":["stationery","packaging","craft","nope"]}' | status)"
+expect "pending도 저장됨" "200" "$(api "$A" PUT /api/me/interests "$FOUR" | status)"
+expect "4개 저장"         "4"   "$(api "$A" GET /api/me/interests | body | count)"
+expect "중복은 접힘"      "200" "$(api "$A" PUT /api/me/interests '{"categories":["stationery","stationery","packaging","craft","disposable"]}' | status)"
+expect "여전히 4개"       "4"   "$(api "$A" GET /api/me/interests | body | count)"
+api "$B" PUT /api/me/interests '{"categories":["event","interior","printed","banner"]}' >/dev/null
+expect "B도 4개"          "4"   "$(api "$B" GET /api/me/interests | body | count)"
+expect "비로그인 401"     "401" "$(curl -s -o /dev/null -w '%{http_code}' -X PUT "$BASE/api/me/interests" -H 'content-type: application/json' --data "$FOUR")"
 
 echo "3. 승인 — 운영자가 둘 다"
 expect "pending manager는 승인 권한 없음 403" "403" "$(api "$B" GET /api/admin/approvals | status)"
@@ -86,6 +100,17 @@ api "$B" POST /api/swipes "$SW" >/dev/null
 expect "넘긴 뒤 피드에서 사라짐" "False" "$(api "$B" GET /api/items | body | has $ITEM)"
 expect "목록엔 여전히 있음" "True" "$(api "$B" GET "/api/items?mode=list" | body | has $ITEM)"
 expect "카테고리 필터" "True" "$(api "$B" GET "/api/items?mode=list&category=packaging" | body | has $ITEM)"
+
+echo "5b. 추천 정렬 — B의 관심 자원이 최신순보다 앞에"
+# B의 관심은 event/interior/printed/banner. interior를 먼저, 관심 밖 stationery를 나중에 등록한다.
+# 최신순만이라면 나중에 등록한 stationery가 1번이어야 한다 — 관심이 이기면 정렬이 도는 것이다.
+OLD_INT="{\"category\":\"interior\",\"name\":\"액자 세트\",\"quantity\":3,\"condition\":\"중\",\"isUsed\":true,\"photos\":[\"$URL\"]}"
+NEW_OFF="{\"category\":\"stationery\",\"name\":\"네임펜 한 박스\",\"quantity\":50,\"condition\":\"상\",\"isUsed\":false,\"photos\":[\"$URL\"]}"
+INT_ID=$(api "$A" POST /api/items "$OLD_INT" | body | jget id)
+OFF_ID=$(api "$A" POST /api/items "$NEW_OFF" | body | jget id)
+expect "관심(interior)이 1번" "$INT_ID" "$(api "$B" GET /api/items | body | first)"
+# A는 관심을 stationery 포함으로 골랐지만 둘 다 자기 기관 것이라 안 보인다 — 정렬이 소속 규칙을 뚫지 않는다.
+expect "A 피드엔 자기 것 없음" "False" "$(api "$A" GET /api/items | body | has $OFF_ID)"
 
 echo "6. 채팅 시작"
 expect "A 자기 기관 물품 신청 400" "400" "$(api "$A" POST /api/transfers "$SW" | status)"

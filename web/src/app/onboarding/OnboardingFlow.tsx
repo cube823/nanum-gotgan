@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
 import type { Category } from "@/lib/types";
 
 type Org = { id: string; name: string; orgType: string; verified: boolean };
@@ -12,7 +11,6 @@ const MIN_PICKS = 4;
 
 export function OnboardingFlow({ categories }: { categories: Category[] }) {
   const router = useRouter();
-  const { update } = useSession();
   const [step, setStep] = useState<"org" | "interests">("org");
   const [q, setQ] = useState("");
   const [results, setResults] = useState<Org[]>([]);
@@ -31,13 +29,26 @@ export function OnboardingFlow({ categories }: { categories: Category[] }) {
     return () => clearTimeout(t);
   }, [q]);
 
-  /** 기관을 정하면 관심 자원으로 넘어간다. JWT 갱신은 마지막에 한 번만. */
+  /** JWT에 org_id를 싣는다. proxy가 이걸 보고 통과시킨다.
+   *  next-auth의 useSession().update()는 클라이언트가 들고 있는 세션 객체를 기준으로 도는데,
+   *  기관을 만든 뒤 관심 화면에 머무는 동안 그게 stale해져 조용히 실패했다 (JWT가 null인 채로 남는다).
+   *  jwt 콜백은 trigger==="update"에서 DB를 다시 읽으므로, 세션 엔드포인트를 직접 친다. */
+  async function refreshJwt(): Promise<boolean> {
+    const { csrfToken } = await fetch("/api/auth/csrf").then((r) => r.json());
+    const s = await fetch("/api/auth/session", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ csrfToken, data: {} }),
+    }).then((r) => r.json());
+    return !!s?.user?.orgId;
+  }
+
   async function submitOrg(body: object) {
     setBusy(true); setError(null);
     const r = await fetch("/api/orgs", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
     const j = await r.json();
+    if (!r.ok) { setError(j.error); setBusy(false); return; }
+    await refreshJwt();
     setBusy(false);
-    if (!r.ok) { setError(j.error); return; }
     setStep("interests");
   }
 
@@ -49,8 +60,12 @@ export function OnboardingFlow({ categories }: { categories: Category[] }) {
     });
     const j = await r.json();
     if (!r.ok) { setError(j.error); setBusy(false); return; }
-    await update();               // JWT에 org_id 싣기 — 그래야 proxy가 통과시킨다
-    router.push("/pending");      // update()가 새 쿠키를 받은 뒤라 다음 요청부터 proxy가 org를 본다
+    if (!(await refreshJwt())) {
+      setError("소속 정보를 반영하지 못했어요. 새로고침한 뒤 다시 시도해 주세요.");
+      setBusy(false); return;     // 조용히 머무는 대신 무엇이 막혔는지 말한다
+    }
+    router.refresh();             // 라우터 캐시를 버려야 push가 새 JWT로 요청한다
+    router.push("/pending");
   }
 
   const toggle = (code: string) =>

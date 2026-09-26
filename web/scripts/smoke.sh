@@ -89,6 +89,8 @@ R=$(api "$A" POST /api/items "$ITEM_JSON"); expect "등록 201" "201" "$(echo "$
 ITEM=$(echo "$R" | body | jget id)
 RED_NO="{\"category\":\"electronics\",\"name\":\"선풍기\",\"quantity\":1,\"condition\":\"중\",\"isUsed\":true,\"photos\":[\"$URL\"]}"
 RED_OK="{\"category\":\"electronics\",\"name\":\"선풍기\",\"quantity\":1,\"condition\":\"중\",\"isUsed\":true,\"approvalConfirmed\":true,\"onLedger\":true,\"fundingSource\":\"자체예산\",\"photos\":[\"$URL\"]}"
+BAD_COND="{\"category\":\"packaging\",\"name\":\"x\",\"quantity\":1,\"condition\":\"새것\",\"isUsed\":false,\"photos\":[\"$URL\"]}"
+expect "표시 라벨을 그대로 보내면 400" "400" "$(api "$A" POST /api/items "$BAD_COND" | status)"
 expect "🔴 전기류 승인 없이 400" "400" "$(api "$A" POST /api/items "$RED_NO" | status)"
 expect "🔴 전기류 승인 있으면 201" "201" "$(api "$A" POST /api/items "$RED_OK" | status)"
 

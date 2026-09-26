@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/session";
 import { getItem } from "@/lib/items";
 import { STATUS_LABEL } from "@/components/ItemGrid";
+import { CONDITION_LABEL } from "@/lib/labels";
 import { ChatButton } from "./ChatButton";
 
 const RISK_NOTE: Record<string, string> = {
@@ -41,7 +42,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
         <dl className="mt-4 grid grid-cols-3 gap-2 text-center text-sm">
           <div className="rounded-xl bg-neutral-50 py-2"><dt className="text-xs text-neutral-400">수량</dt><dd className="font-semibold">{item.quantity}{item.quantityUnit}</dd></div>
           <div className="rounded-xl bg-neutral-50 py-2"><dt className="text-xs text-neutral-400">사용 여부</dt><dd className="font-semibold">{item.isUsed ? "사용" : "미사용"}</dd></div>
-          <div className="rounded-xl bg-neutral-50 py-2"><dt className="text-xs text-neutral-400">상태</dt><dd className="font-semibold">{item.condition}</dd></div>
+          <div className="rounded-xl bg-neutral-50 py-2"><dt className="text-xs text-neutral-400">상태</dt><dd className="font-semibold">{CONDITION_LABEL[item.condition]}</dd></div>
         </dl>
 
         {item.description && <p className="mt-4 whitespace-pre-wrap leading-relaxed">{item.description}</p>}

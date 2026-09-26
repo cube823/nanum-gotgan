@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Category } from "@/lib/types";
+import { CONDITION_LABEL, CONDITIONS } from "@/lib/labels";
 
 /** MVP §4.1 — 사진 → 정보, 한 페이지 2스텝. AI 토글 없음. */
 export function NewItemForm({ categories }: { categories: Category[] }) {
@@ -116,9 +117,9 @@ export function NewItemForm({ categories }: { categories: Category[] }) {
               </div></div>
             <div><label className="label">상태</label>
               <div className="flex gap-2">
-                {["상", "중", "하"].map((v) => (
+                {CONDITIONS.map((v) => (
                   <button key={v} type="button" onClick={() => set("condition", v)}
-                    className={`btn flex-1 text-sm py-2 ${f.condition === v ? "bg-brand text-white" : "bg-neutral-100"}`}>{v}</button>
+                    className={`btn flex-1 text-sm py-2 px-2 ${f.condition === v ? "bg-brand text-white" : "bg-neutral-100"}`}>{CONDITION_LABEL[v]}</button>
                 ))}
               </div></div>
           </div>

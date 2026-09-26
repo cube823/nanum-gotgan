@@ -6,6 +6,7 @@ export type OrgType = "위탁" | "직영" | "모름";
 export type ItemStatus = "open" | "reserved" | "completed" | "withdrawn";
 export type TransferStatus = "requested" | "scheduled" | "completed" | "cancelled";
 export type Risk = "green" | "yellow" | "red";
+export type Condition = "상" | "중" | "하";
 
 export type DbUser = {
   id: string;
@@ -43,7 +44,7 @@ export type Item = {
   quantity: number;
   quantityUnit: string;
   isUsed: boolean;
-  condition: "상" | "중" | "하";
+  condition: Condition;
   onLedger: boolean;
   approvalConfirmed: boolean;
   fundingSource: string | null;

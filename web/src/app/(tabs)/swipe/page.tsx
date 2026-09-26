@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { ItemCard } from "@/lib/types";
+import { CONDITION_LABEL } from "@/lib/labels";
 
 /**
  * 02 기획서: 좌 = 이전, 우 = 다음, X = 다음, ↑ = 상세, 돋보기 = 목록.
@@ -78,7 +79,7 @@ export default function SwipePage() {
               <div className="absolute inset-x-0 bottom-0 p-5 bg-gradient-to-t from-black/70 to-transparent text-white">
                 <span className="chip bg-white/20 backdrop-blur">{card.categoryLabel}</span>
                 <p className="mt-2 text-2xl font-bold">{card.name}</p>
-                <p className="text-sm opacity-80">{card.orgName} · {card.quantity}{card.quantityUnit} · 상태 {card.condition}</p>
+                <p className="text-sm opacity-80">{card.orgName} · {card.quantity}{card.quantityUnit} · {CONDITION_LABEL[card.condition]}</p>
                 {card.description && <p className="mt-2 text-sm opacity-80 line-clamp-2">{card.description}</p>}
               </div>
               <span className="absolute top-3 right-3 text-xs bg-black/40 text-white rounded-full px-2 py-0.5">{idx + 1} / {cards.length}</span>

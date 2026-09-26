@@ -1,6 +1,7 @@
 import { sql } from "@/lib/db";
 import { api, requireUser, requireVerified, HttpError } from "@/lib/session";
 import { swipeFeed, listFeed } from "@/lib/items";
+import { CONDITIONS } from "@/lib/labels";
 
 export const GET = api(async (req) => {
   const u = await requireUser();
@@ -12,7 +13,7 @@ export const GET = api(async (req) => {
   return Response.json(await swipeFeed(u.id, u.orgId));
 });
 
-const CONDITIONS = new Set(["상", "중", "하"]);
+const CONDITION_SET = new Set<string>(CONDITIONS);
 const FUNDING = new Set(["자체예산", "보조금", "기타", "모름"]);
 
 /** MVP §4.1 등록. 🔴는 DB 제약이 한 번 더 막는다. */
@@ -26,7 +27,7 @@ export const POST = api(async (req) => {
 
   if (!name) throw new HttpError(400, "물품 이름을 적어 주세요.");
   if (!Number.isInteger(quantity) || quantity < 1) throw new HttpError(400, "수량은 1 이상이어야 해요.");
-  if (!CONDITIONS.has(b.condition)) throw new HttpError(400, "상태를 골라 주세요.");
+  if (!CONDITION_SET.has(b.condition)) throw new HttpError(400, "상태를 골라 주세요.");
   if (photos.length < 1 || photos.length > 10) throw new HttpError(400, "사진은 1~10장이어야 해요.");
   if (b.fundingSource && !FUNDING.has(b.fundingSource)) throw new HttpError(400, "취득 재원이 올바르지 않아요.");
 

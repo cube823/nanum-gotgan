@@ -56,13 +56,13 @@ export function KakaoMap({ item, mine, itemName, distanceKm }: {
       new maps.Polyline({ map, path: [a, b], strokeWeight: 2, strokeColor: brand, strokeOpacity: 0.9, strokeStyle: "dash" });
       if (distanceKm != null) {
         new maps.CustomOverlay({
-          map, zIndex: 3, yAnchor: 1.4,
+          map, zIndex: 3, yAnchor: 2.6,   // Figma: 알약이 점선 중점보다 ~48px 위
           position: new maps.LatLng((iLat + mLat) / 2, (iLng + mLng) / 2),
           content: `<span style="display:inline-block;padding:3px 10px;border-radius:9999px;background:#fff;color:${brand};font-size:12px;font-weight:700;box-shadow:0 1px 4px rgba(0,0,0,.15)">약 ${distanceKm}km</span>`,
         });
       }
       const bounds = new maps.LatLngBounds(); bounds.extend(a); bounds.extend(b);
-      map.setBounds(bounds, 40, 40, 40, 40);
+      map.setBounds(bounds, 64, 40, 28, 40);   // 위쪽을 더 비워 알약이 잘리지 않게 (상·우·하·좌)
     }).catch(() => { if (!cancelled) setFailed(true); });
     return () => { cancelled = true; };
   }, [iLat, iLng, mLat, mLng, distanceKm]);

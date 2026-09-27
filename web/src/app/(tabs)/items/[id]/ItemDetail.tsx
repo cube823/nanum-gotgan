@@ -7,6 +7,7 @@ import { STATUS_LABEL } from "@/components/ItemGrid";
 import { CONDITION_LABEL, ago } from "@/lib/labels";
 import { ChatButton } from "./ChatButton";
 import { KakaoMap } from "@/components/KakaoMap";
+import { SheetCloseButton } from "@/components/Sheet";
 
 const RISK_NOTE: Record<string, string> = {
   yellow: "반복 사용하는 물품이면 비품으로 관리될 수 있어요.",
@@ -37,21 +38,20 @@ export async function ItemDetail({ id, sheet = false }: { id: string; sheet?: bo
 
   return (
     <article className={sheet ? "min-h-full flex flex-col" : ""}>
-      {/* 시트(기획 정의서 11)엔 사진이 없다 — 시트 위로 살짝 보이는 뒤의 스와이프 카드가 사진이다.
-          직접 들어온 전체 화면에서만 사진을 위에 깐다. */}
-      {!sheet && (
-        <div className="relative">
-          <div className="flex overflow-x-auto snap-x snap-mandatory">
-            {item.photos.map((p) => (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img key={p} src={p} alt="" className="w-full aspect-square object-cover snap-center shrink-0" />
-            ))}
-          </div>
-          <Link href="/swipe" aria-label="뒤로" className="absolute top-3 left-3 size-9 rounded-full bg-black/40 text-white grid place-items-center">←</Link>
+      {/* 기획 정의서 11 — 맨 위 사진(390:300). 시트면 오른쪽 위 ↓로 내리고, 직접 들어온 전체 화면이면 ← 뒤로. */}
+      <div className="relative">
+        <div className="flex overflow-x-auto snap-x snap-mandatory">
+          {item.photos.map((p) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img key={p} src={p} alt="" className="w-full aspect-[13/10] object-cover snap-center shrink-0" />
+          ))}
         </div>
-      )}
+        {sheet
+          ? <span className="absolute top-4 right-4 z-20"><SheetCloseButton /></span>
+          : <Link href="/swipe" aria-label="뒤로" className="absolute top-3 left-3 size-9 rounded-full bg-black/40 text-white grid place-items-center">←</Link>}
+      </div>
 
-      <div className={`px-[22px] ${sheet ? "pt-7 flex-1 flex flex-col" : "pt-6"}`}>
+      <div className={`px-[22px] pt-6 ${sheet ? "flex-1 flex flex-col" : ""}`}>
         <div className="flex items-center justify-between">
           <span className="flex gap-1.5">
             <span className="rounded-full bg-brand/10 px-3 py-1 text-xs font-semibold text-brand">{item.categoryLabel}</span>

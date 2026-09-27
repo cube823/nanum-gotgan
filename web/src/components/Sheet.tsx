@@ -39,3 +39,14 @@ export function Sheet({ label, children }: { label: string; children: React.Reac
     </div>
   );
 }
+
+/** 기획 정의서 11 — 사진 오른쪽 위 ↓. 시트를 내린다 (배경 탭·Esc·끌어내리기와 같다). */
+export function SheetCloseButton() {
+  const router = useRouter();
+  return (
+    <button type="button" onClick={() => router.back()} aria-label="내리기"
+      className="size-9 rounded-full bg-white shadow-md grid place-items-center text-neutral-800">
+      <svg aria-hidden viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M6 13l6 6 6-6" /></svg>
+    </button>
+  );
+}

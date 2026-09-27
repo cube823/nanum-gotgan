@@ -25,7 +25,7 @@ pnpm dev                                       # http://localhost:3000  (루트�
 ## 확인
 
 ```bash
-pnpm smoke                     # dev 서버 떠 있을 때. 계정 3개로 한 바퀴 (68건)
+pnpm smoke                     # dev 서버 떠 있을 때. 계정 3개로 한 바퀴 (75건)
 pnpm typecheck
 pnpm lint
 pnpm build

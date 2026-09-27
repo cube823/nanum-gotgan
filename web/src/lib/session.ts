@@ -11,7 +11,7 @@ export async function currentUser(): Promise<DbUser | null> {
   const session = await auth();
   if (!session?.user?.id) return null;
   const [u] = await sql<DbUser[]>`
-    SELECT id, org_id, email, nickname, profile_image, org_role, org_status, is_admin
+    SELECT id, org_id, email, nickname, profile_image, real_name, phone, org_role, org_status, is_admin
     FROM users WHERE id = ${session.user.id}`;
   return u ?? null;
 }

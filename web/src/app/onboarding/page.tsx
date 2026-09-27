@@ -1,4 +1,5 @@
 import { sql } from "@/lib/db";
+import { requireUser } from "@/lib/session";
 import { OnboardingFlow } from "./OnboardingFlow";
 import type { Category } from "@/lib/types";
 
@@ -10,5 +11,14 @@ export default async function OnboardingPage() {
   const cats = await sql<Category[]>`
     SELECT code, label, risk_level, notice FROM categories
     WHERE risk_level <> 'red' ORDER BY sort_order`;
-  return <OnboardingFlow categories={cats} />;
+
+  // 새로고침하거나 중간에 나갔다 와도 채운 데까지는 건너뛴다.
+  const u = await requireUser();
+
+  return (
+    <OnboardingFlow
+      categories={cats}
+      profile={{ realName: u.realName ?? "", phone: u.phone ?? "" }}
+    />
+  );
 }

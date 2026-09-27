@@ -1,13 +1,16 @@
 import { sql } from "@/lib/db";
 import { api, requireUser, HttpError } from "@/lib/session";
 import { normalizeOrgName } from "@/lib/org";
+import { checkBizNo, normalizeBizNo } from "@/lib/bizno";
 
 const ORG_TYPES = new Set(["위탁", "직영", "모름"]);
 
 /**
  * 소속 정하기. DB-SCHEMA §1.5.
- *  { orgId }              → 기존 기관에 member로 합류 (pending)
- *  { name, orgType }      → 새 기관 생성 + 만든 사람이 manager (pending)
+ *  { orgId }                      → 기존 기관에 member로 합류 (pending)
+ *  { name, orgType, bizNo }       → 새 기관 생성 + 만든 사람이 manager (pending)
+ * bizNo는 국세청 상태조회로 실재·휴폐업만 본다. 상호는 그 API가 검증하지 않으므로
+ * "그 기관 소속"은 여전히 승인이 정한다 (lib/bizno.ts).
  * 이미 verified면 못 바꾼다 — 소속 변경은 MVP 밖.
  */
 export const POST = api(async (req) => {
@@ -28,13 +31,18 @@ export const POST = api(async (req) => {
   if (name.length < 2) throw new HttpError(400, "기관명을 두 글자 이상 적어 주세요.");
   if (!ORG_TYPES.has(orgType)) throw new HttpError(400, "운영 형태가 올바르지 않아요.");
 
+  const bizRaw = String(body.bizNo ?? "").trim();
+  if (!bizRaw) throw new HttpError(400, "사업자등록번호를 적어 주세요.");
+  const biz = await checkBizNo(bizRaw);
+  if (!biz.ok) throw new HttpError(400, biz.reason);
+
   const norm = normalizeOrgName(name);
   const [dup] = await sql`SELECT id, name FROM organizations WHERE name_norm = ${norm}`;
   if (dup) throw new HttpError(409, `"${dup.name}"이(가) 이미 있어요. 목록에서 골라 주세요.`);
 
   const [org] = await sql`
-    INSERT INTO organizations (name, name_norm, org_type, created_by)
-    VALUES (${name}, ${norm}, ${orgType}, ${u.id}) RETURNING id`;
+    INSERT INTO organizations (name, name_norm, org_type, biz_no, created_by)
+    VALUES (${name}, ${norm}, ${orgType}, ${normalizeBizNo(bizRaw)}, ${u.id}) RETURNING id`;
   await sql`UPDATE users SET org_id = ${org.id}, org_role = 'manager', org_status = 'pending' WHERE id = ${u.id}`;
-  return Response.json({ orgId: org.id, role: "manager" });
+  return Response.json({ orgId: org.id, role: "manager", bizChecked: biz.checked });
 });

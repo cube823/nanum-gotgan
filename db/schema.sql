@@ -10,6 +10,9 @@ CREATE TABLE organizations (
   name          text NOT NULL,
   name_norm     text NOT NULL UNIQUE,
   org_type      text NOT NULL CHECK (org_type IN ('위탁', '직영', '모름')),
+  -- 회원가입 STEP 2. '-' 없는 10자리. 국세청 상태조회로 실재·휴폐업만 본다 —
+  -- 상호(기관명)는 그 API가 검증하지 않으므로 소속 판정은 여전히 사람이 승인한다.
+  biz_no        text,
   address       text,
   lat           numeric(9,6),
   lng           numeric(9,6),
@@ -26,6 +29,10 @@ CREATE TABLE users (
   auth_subject    text NOT NULL,
   nickname        text NOT NULL,
   profile_image   text,
+
+  -- 회원가입 STEP 1 (기획 정의서). nickname은 OAuth 프로필이라 실명이 아닐 수 있다.
+  real_name       text,
+  phone           text,
 
   org_role        text NOT NULL DEFAULT 'member'
                   CHECK (org_role IN ('member', 'manager')),

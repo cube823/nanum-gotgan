@@ -7,9 +7,11 @@
 
 ```
 /login ─OAuth 또는 dev─▶ users upsert (auth.ts signIn)
-  → org 없음 → /onboarding
-       1단계 기관: 자동완성 검색 → 기존 기관 합류(member) 또는 신규 생성(manager)
-       2단계 관심 자원: 🔴 뺀 9개 중 4개 이상 (Figma STEP 3)
+  → org 없음 → /onboarding (Figma "회원가입 프로세스 정의서" 4단계)
+       STEP 1 개인정보: 실명·휴대폰 (users.real_name/phone)
+       STEP 2 기관정보: 자동완성 검색 → 합류(member) 또는 신규 생성(manager) + 사업자등록번호
+       STEP 3 관심 자원: 🔴 뺀 9개 중 4개 이상
+       STEP 4 가입 완료: "○○○님이 필요한 자원을 찾고 있어요" → 시작하기
   → org_status = pending → /pending (5초 폴링)
   → 운영자(첫 담당자) 또는 같은 기관 verified manager가 승인 → verified
   → session.update() → /swipe
@@ -24,7 +26,8 @@ pending은 조회는 된다 — 가둬두지 않는다. 등록·신청만 403.
 | 인증 | `web/src/auth.ts` — 프로바이더, `signIn`(upsert), `jwt`(org 필드 싣기, `trigger==="update"`에 DB 재조회) |
 | 게이트 | `web/src/proxy.ts` |
 | 화면 | `web/src/app/login/page.tsx`, `onboarding/page.tsx`, `pending/page.tsx`, `admin/approvals/page.tsx` |
-| API | `api/me`, `api/orgs/search` (자동완성), `api/orgs` (합류/생성), `api/me/interests` (관심 자원 GET/PUT), `api/admin/approvals` (GET 목록 / PATCH 승인·반려) |
+| API | `api/me`, `api/me/profile` (실명·전화 PUT), `api/orgs/search` (자동완성), `api/orgs` (합류/생성+사업자번호), `api/me/interests` (관심 자원 GET/PUT), `api/admin/approvals` (GET 목록 / PATCH 승인·반려) |
+| 사업자번호 | `web/src/lib/bizno.ts` — 체크디지트 + 국세청 상태조회 |
 | 정규화 | `web/src/lib/org.ts` `normalizeOrgName` — 띄어쓰기·기호까지만. 글자 다른 건 자동완성이 막는다 |
 
 ## 규칙
@@ -52,8 +55,17 @@ pending은 조회는 된다 — 가둬두지 않는다. 등록·신청만 403.
 
 ## 기획서와 다른 것
 
-Figma STEP 2는 **기관명 + 사업자등록번호 자동 인증**("인증하기" → 매칭 확인)이다. 구현은 기관명 + 운영 형태만
-받고 사람이 승인한다 — 기관 명단을 시딩하지 않기로 했으므로(`decisions/0001`) 대조할 원본이 없다.
-Figma는 이 결정 이후 문서인데도 인증 흐름을 그리고 있다. **기획팀 확인 필요.**
+Figma STEP 2는 "인증하기" → **"기관 정보가 확인되었어요"** 로 끝난다. 구현은 그 문구를 쓰지 않는다.
 
-STEP 1의 이름·전화번호 수집도 없다. OAuth 프로필의 닉네임을 쓴다.
+국세청 API는 두 종류인데 둘 다 그 화면을 만들어 주지 못한다:
+
+- **진위확인**(`/validate`)은 번호 + 개업일자 + 대표자성명을 대조한다. 상호(기관명)는 공식 문서에
+  "참고용, 검증 대상 아님"으로 명시돼 있어, 상호가 틀려도 나머지가 맞으면 일치로 응답한다.
+  게다가 센터 담당자가 자기 기관 개업일자·대표자명을 알 가능성이 낮아 가입이 막힌다.
+- **상태조회**(`/status`)는 번호 하나로 실재 여부와 휴·폐업만 본다. ← 이것만 쓴다.
+
+그래서 화면 문구도 "확인되었어요"가 아니라 **"실재하는 번호인지만 확인해요. 소속은 운영자가 승인해요"** 다.
+기관 사칭 방어선은 여전히 승인이다 (`decisions/0001` — 기관 명단을 시딩하지 않는다).
+
+`NTS_API_KEY`가 없으면 체크디지트 검사까지만 하고 통과시킨다. 국세청이 죽거나 타임아웃이어도
+가입은 막지 않는다 — 승인이 뒤에 있으므로 여기서 문을 잠글 이유가 없다.

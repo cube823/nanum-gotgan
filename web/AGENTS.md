@@ -53,7 +53,7 @@ export const POST = api(async (req, { params }) => {
 
 ```bash
 pnpm typecheck && pnpm lint && pnpm build
-pnpm dev &  pnpm smoke      # 68건
+pnpm dev &  pnpm smoke      # 75건
 ```
 
 `.env.local`이 없으면 `.env.example`을 복사. `ADMIN_EMAILS`의 이메일로 dev 로그인하면 운영자.

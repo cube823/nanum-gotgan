@@ -14,6 +14,8 @@ export type DbUser = {
   email: string | null;
   nickname: string;
   profileImage: string | null;
+  realName: string | null;      // 회원가입 STEP 1. nickname(OAuth)과 다를 수 있다
+  phone: string | null;
   orgRole: OrgRole;
   orgStatus: OrgStatus;
   isAdmin: boolean;

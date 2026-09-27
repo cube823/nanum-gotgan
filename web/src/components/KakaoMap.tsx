@@ -26,8 +26,9 @@ function loadSdk(): Promise<any> {
 /** globals.css @theme 토큰. 폴리라인은 SVG 속성이라 var()를 못 쓴다 — 계산된 값을 넘긴다. */
 const token = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
+/** 가운데 맞춤은 CustomOverlay 기본값(xAnchor·yAnchor 0.5)이 한다 — 여기서 transform으로 또 옮기면 선 끝과 어긋난다. */
 const pin = (color: string) =>
-  `<span style="display:block;width:18px;height:18px;border-radius:9999px;background:#fff;border:5px solid ${color};box-shadow:0 1px 4px rgba(0,0,0,.25);transform:translate(-50%,-50%)"></span>`;
+  `<span style="display:block;width:18px;height:18px;border-radius:9999px;background:#fff;border:5px solid ${color};box-shadow:0 1px 4px rgba(0,0,0,.25)"></span>`;
 
 /** 기획 정의서 11 위치 지도. 물품 기관(초록) ↔ 우리 기관(빨강), 점선, 가운데 "약 n km".
  *  보기 전용 — 끌기·확대를 막아 시트 스크롤을 뺏지 않는다. 누르면 카카오맵 길찾기.

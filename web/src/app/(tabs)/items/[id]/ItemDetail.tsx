@@ -6,6 +6,7 @@ import { getItem, DISTANCE_KM } from "@/lib/items";
 import { STATUS_LABEL } from "@/components/ItemGrid";
 import { CONDITION_LABEL, ago } from "@/lib/labels";
 import { ChatButton } from "./ChatButton";
+import { KakaoMap } from "@/components/KakaoMap";
 
 const RISK_NOTE: Record<string, string> = {
   yellow: "반복 사용하는 물품이면 비품으로 관리될 수 있어요.",
@@ -13,8 +14,8 @@ const RISK_NOTE: Record<string, string> = {
 };
 
 /** 기획 정의서 11 — 물품 상세. 스와이프 ↑로 온다.
- *  Figma의 "크기" 행은 뺐다 — 크기 필드가 없다. 지도 그림은 아직 없다(설계 P3) —
- *  거리("약 n km", 직선)와 두 기관 주소만 보여준다. 좌표 없는 기관이면 거리는 숨긴다. */
+ *  Figma의 "크기" 행은 뺐다 — 크기 필드가 없다. 위치는 카카오맵(components/KakaoMap) + 두 기관 주소.
+ *  좌표 없는 기관(직접 등록한 기관 — 주소를 아직 안 받는다)이면 지도·거리 없이 주소 줄만. */
 export async function ItemDetail({ id, sheet = false }: { id: string; sheet?: boolean }) {
   const u = await requireUser();
   const item = await getItem(id);
@@ -23,6 +24,7 @@ export async function ItemDetail({ id, sheet = false }: { id: string; sheet?: bo
   const [meta] = await sql`
     SELECT COALESCE(owner.real_name, owner.nickname) AS owner_name, o.address AS org_address,
       me.name AS my_org_name, me.address AS my_org_address, ${DISTANCE_KM} AS distance_km,
+      o.lat::float AS lat, o.lng::float AS lng, me.lat::float AS my_lat, me.lng::float AS my_lng,
       (SELECT count(*)::int FROM bookmarks b WHERE b.item_id = ${item.id}) AS bookmark_count,
       (SELECT count(*)::int FROM transfers t WHERE t.item_id = ${item.id} AND t.status <> 'cancelled') AS chat_count
     FROM users owner
@@ -102,10 +104,13 @@ export async function ItemDetail({ id, sheet = false }: { id: string; sheet?: bo
 
         {RISK_NOTE[item.riskLevel] && <p className="mt-4 text-xs text-neutral-500 rounded-xl bg-amber-50 p-3">{RISK_NOTE[item.riskLevel]}</p>}
 
-        <h2 className="mt-8 flex items-baseline justify-between font-bold">
-          위치
-          {meta.distanceKm != null && !sameOrg && <span className="text-sm font-semibold text-brand">약 {meta.distanceKm}km</span>}
-        </h2>
+        <h2 className="mt-8 font-bold">위치</h2>
+        {/* 좌표가 있으면 지도(거리는 지도 위 알약), 없으면 지도 없이 주소만 */}
+        {meta.lat != null && (
+          <KakaoMap item={{ lat: meta.lat, lng: meta.lng }} itemName={item.orgName}
+            mine={meta.myLat != null && !sameOrg ? { lat: meta.myLat, lng: meta.myLng } : null}
+            distanceKm={sameOrg ? null : meta.distanceKm} />
+        )}
         <ul className="mt-3 mb-4 space-y-2 text-sm">
           <li className="flex gap-2">
             <span aria-hidden className="mt-1.5 size-2 shrink-0 rounded-full bg-brand" />

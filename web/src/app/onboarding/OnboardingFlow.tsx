@@ -37,6 +37,7 @@ export function OnboardingFlow({
   const [active, setActive] = useState(-1);       // 방향키로 고른 행. results.length 번째 = "새로 등록"
   const [bizNo, setBizNo] = useState("");
   const [bizOk, setBizOk] = useState<null | { matched: boolean }>(null);
+  const [address, setAddress] = useState("");      // 새 기관만. 서버가 좌표로 바꾼다 (지도·거리)
 
   // STEP 3
   const [picks, setPicks] = useState<string[]>([]);
@@ -257,6 +258,16 @@ export function OnboardingFlow({
         <input id="bizno" className="field" value={bizNo} inputMode="numeric" placeholder="000-00-00000"
           onChange={(e) => { setBizNo(e.target.value); setBizOk(null); setError(null); }} />
 
+        {!picked && (
+          <>
+            <label htmlFor="addr" className={label}>기관 주소</label>
+            <input id="addr" className="field" value={address} autoComplete="street-address"
+              placeholder="예: 서울 용산구 한강대로 366"
+              onChange={(e) => { setAddress(e.target.value); setError(null); }} />
+            <p className="mt-1.5 text-xs text-neutral-400">물품 위치 지도와 거리를 보여주는 데 써요.</p>
+          </>
+        )}
+
         {err}
 
         {bizOk ? (
@@ -273,8 +284,8 @@ export function OnboardingFlow({
           </button>
         )}
 
-        <button disabled={busy || !bizOk}
-          onClick={() => submitOrg(picked ? { orgId: picked.id, bizNo } : { name: typed, orgType: "모름", bizNo })}
+        <button disabled={busy || !bizOk || (!picked && address.trim().length < 5)}
+          onClick={() => submitOrg(picked ? { orgId: picked.id, bizNo } : { name: typed, orgType: "모름", bizNo, address: address.trim() })}
           className="btn-cta mt-3">다음으로</button>
       </StepShell>
     );

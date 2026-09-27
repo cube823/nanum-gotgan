@@ -57,11 +57,15 @@ echo "2. 소속 — 기관 생성/합류 (바로 verified, decisions/0008)"
 # 사업자등록번호는 국세청 체크디지트를 통과해야 한다 (lib/bizno.ts).
 # 아래 번호는 체크디지트만 맞춘 테스트값이다 — 실존 사업자와 무관하다.
 # JSON은 변수에 담아 넘긴다 — $( ) 안에 인라인으로 쓰면 \" 가 한 번 더 해석돼 body가 깨진다.
-NO_BIZ="{\"name\":\"번호없는센터$SUF\",\"orgType\":\"위탁\"}"
-BAD_BIZ="{\"name\":\"틀린번호센터$SUF\",\"orgType\":\"위탁\",\"bizNo\":\"1234567890\"}"
-ZERO_BIZ="{\"name\":\"영번호센터$SUF\",\"orgType\":\"위탁\",\"bizNo\":\"0000000000\"}"
-ORG_A="{\"name\":\"테스트 청년센터 A$SUF\",\"orgType\":\"위탁\",\"bizNo\":\"3098100129\"}"
-ORG_B="{\"name\":\"테스트 청년센터 B$SUF\",\"orgType\":\"모름\",\"bizNo\":\"309-81-00342\"}"
+NO_BIZ="{\"name\":\"번호없는센터$SUF\",\"orgType\":\"위탁\",\"address\":\"서울특별시 중구 세종대로 110\"}"
+BAD_BIZ="{\"name\":\"틀린번호센터$SUF\",\"orgType\":\"위탁\",\"bizNo\":\"1234567890\",\"address\":\"서울특별시 중구 세종대로 110\"}"
+ZERO_BIZ="{\"name\":\"영번호센터$SUF\",\"orgType\":\"위탁\",\"bizNo\":\"0000000000\",\"address\":\"서울특별시 중구 세종대로 110\"}"
+ORG_A="{\"name\":\"테스트 청년센터 A$SUF\",\"orgType\":\"위탁\",\"bizNo\":\"3098100129\",\"address\":\"서울특별시 중구 세종대로 110\"}"
+ORG_B="{\"name\":\"테스트 청년센터 B$SUF\",\"orgType\":\"모름\",\"bizNo\":\"309-81-00342\",\"address\":\"서울특별시 종로구 사직로 161\"}"
+NO_ADDR="{\"name\":\"주소없는센터$SUF\",\"orgType\":\"위탁\",\"bizNo\":\"3098100129\"}"
+BAD_ADDR="{\"name\":\"주소틀린센터$SUF\",\"orgType\":\"위탁\",\"bizNo\":\"3098100129\",\"address\":\"없는나라 없는길 99999\"}"
+expect "주소 없이 400"  "400" "$(api "$A" POST /api/orgs "$NO_ADDR" | status)"
+expect "못 찾는 주소 400" "400" "$(api "$A" POST /api/orgs "$BAD_ADDR" | status)"
 expect "번호 없이 400"  "400" "$(api "$A" POST /api/orgs "$NO_BIZ" | status)"
 expect "체크디지트 400" "400" "$(api "$A" POST /api/orgs "$BAD_BIZ" | status)"
 expect "0반복 400"      "400" "$(api "$A" POST /api/orgs "$ZERO_BIZ" | status)"
@@ -75,7 +79,7 @@ expect "A manager"  "manager" "$(api "$A" GET /api/me | body | jget orgRole)"
 expect "소속 확정 후 재지정 400" "400" "$(api "$A" POST /api/orgs "$ORG_B" | status)"
 # 중복 검사는 아직 소속이 없는 계정이라야 거기까지 간다 (위는 "이미 확정" 에서 먼저 걸린다)
 D=$J/d; login "$D" "d$SUF@dev.local" "중복 시도자"
-DUP="{\"name\":\"테스트청년센터A$SUF\",\"orgType\":\"직영\",\"bizNo\":\"309-81-00342\"}"
+DUP="{\"name\":\"테스트청년센터A$SUF\",\"orgType\":\"직영\",\"bizNo\":\"309-81-00342\",\"address\":\"서울특별시 중구 세종대로 110\"}"
 expect "중복 기관명 409" "409" "$(api "$D" POST /api/orgs "$DUP" | status)"
 # 기존 기관 합류 경로도 바로 verified여야 한다 — 신규 생성만 보면 이 분기를 놓친다
 AORG=$(api "$A" GET /api/me | body | python3 -c "import sys,json; print(json.load(sys.stdin)['org']['id'])")
@@ -159,7 +163,7 @@ expect "없는 물품 404"      "404"   "$(api "$B" PUT "/api/items/00000000-000
 api "$B" PUT "/api/items/$INT_ID/bookmark" >/dev/null   # 아래 /me?tab=bookmarks 화면에 한 건 남긴다
 
 echo "5d. 거리 — 시드 기관 좌표로 직선거리 (db/orgs.sql)"
-# 강동 ↔ 마포 = 18.7km (psql 하버사인으로 확인한 값). 좌표 없는 테스트 기관(B)이 보면 null.
+# 강동 ↔ 마포 = 18.7km (psql 하버사인으로 확인한 값).
 orgid() { python3 -c "import sys,json; print(next(o['id'] for o in json.load(sys.stdin) if o['name']=='$1'))"; }
 E=$J/e F=$J/f
 login "$E" "e$SUF@dev.local" "강동 담당"; login "$F" "f$SUF@dev.local" "마포 담당"
@@ -170,7 +174,8 @@ api "$E" POST /api/orgs "$JOIN_GD" >/dev/null; api "$F" POST /api/orgs "$JOIN_MP
 GD_ITEM_BODY="{\"category\":\"packaging\",\"name\":\"거리 확인용 박스\",\"quantity\":1,\"condition\":\"중\",\"isUsed\":true,\"photos\":[\"$URL\"]}"
 GD_ITEM=$(api "$E" POST /api/items "$GD_ITEM_BODY" | body | jget id)
 expect "마포에서 본 강동 물품 18.7km" "18.7" "$(api "$F" GET /api/items | body | dist $GD_ITEM)"
-expect "좌표 없는 기관이 보면 null"   "None" "$(api "$B" GET /api/items | body | dist $GD_ITEM)"
+# B는 직접 등록한 기관이지만 가입 때 주소를 받아 좌표가 있다 — 거리가 나와야 한다 (종로 사직로 ↔ 강동)
+expect "직접 등록 기관도 거리 나옴" "True" "$(api "$B" GET /api/items | body | dist $GD_ITEM | python3 -c 'import sys; v=sys.stdin.read().strip(); print(v not in ("None","missing") and float(v) > 0)')"
 
 echo "6. 채팅 시작"
 expect "A 자기 기관 물품 신청 400" "400" "$(api "$A" POST /api/transfers "$SW" | status)"
@@ -200,7 +205,7 @@ R=$(api "$A" POST /api/items "$ITEM_JSON"); ITEM3=$(echo "$R" | body | jget id)
 SW3="{\"itemId\":\"$ITEM3\"}"
 login "$ADM" "admin@dev.local" "운영자"   # 운영자에게도 소속을 줘서 신청자 C 역할
 C=$J/c; login "$C" "c$SUF@dev.local" "기관C 담당자"
-ORG_C="{\"name\":\"테스트 청년센터 C$SUF\",\"orgType\":\"직영\",\"bizNo\":\"3098100565\"}"
+ORG_C="{\"name\":\"테스트 청년센터 C$SUF\",\"orgType\":\"직영\",\"bizNo\":\"3098100565\",\"address\":\"서울특별시 용산구 한강대로 366\"}"
 api "$C" POST /api/orgs "$ORG_C" >/dev/null
 cuid=$(api "$C" GET /api/me | body | jget id); APPROVE_C="{\"userId\":\"$cuid\",\"action\":\"approve\"}"
 api "$ADM" PATCH /api/admin/approvals "$APPROVE_C" >/dev/null

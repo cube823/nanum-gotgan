@@ -2,13 +2,14 @@ import { sql } from "@/lib/db";
 import { api, requireUser, HttpError } from "@/lib/session";
 import { normalizeOrgName } from "@/lib/org";
 import { checkBizNo, checkBizNoFor, normalizeBizNo } from "@/lib/bizno";
+import { geocode } from "@/lib/geo";
 
 const ORG_TYPES = new Set(["위탁", "직영", "모름"]);
 
 /**
  * 소속 정하기. DB-SCHEMA §1.5.
  *  { orgId, bizNo }               → 기존 기관에 member로 합류 (번호가 저장된 기관이면 대조)
- *  { name, orgType, bizNo }       → 새 기관 생성 + 만든 사람이 manager
+ *  { name, orgType, bizNo, address } → 새 기관 생성 + 만든 사람이 manager. 주소는 좌표로 바꿔 둔다 (지도·거리)
  *
  * 둘 다 바로 verified다 — 기획 정의서(Figma)에 승인 단계가 없다. 가입 4단계가 끝나면
  * 곧장 자원보기로 간다 (`decisions/0008`). 기관 목록은 서울시 청년센터 명단으로
@@ -41,6 +42,9 @@ export const POST = api(async (req) => {
   if (name.length < 2) throw new HttpError(400, "기관명을 두 글자 이상 적어 주세요.");
   if (!ORG_TYPES.has(orgType)) throw new HttpError(400, "운영 형태가 올바르지 않아요.");
 
+  const addrRaw = String(body.address ?? "").trim();
+  if (addrRaw.length < 5) throw new HttpError(400, "기관 주소를 적어 주세요.");
+
   const bizRaw = String(body.bizNo ?? "").trim();
   if (!bizRaw) throw new HttpError(400, "사업자등록번호를 적어 주세요.");
   const biz = await checkBizNo(bizRaw);
@@ -50,9 +54,15 @@ export const POST = api(async (req) => {
   const [dup] = await sql`SELECT id, name FROM organizations WHERE name_norm = ${norm}`;
   if (dup) throw new HttpError(409, `"${dup.name}"이(가) 이미 있어요. 목록에서 골라 주세요.`);
 
+  // 주소 → 좌표. 물품 상세 지도와 거리가 기관 좌표를 쓴다 — 주소 없이 만들면 그 기관 물품엔 지도가 영영 안 뜬다.
+  // 형식 검사는 위에서(카카오 부르기 전), 좌표 변환은 중복 검사 뒤에 — 409로 끝날 요청에 API를 쓰지 않는다.
+  const geo = await geocode(addrRaw);
+  if (geo === "not_found") throw new HttpError(400, "주소를 찾지 못했어요. 도로명 주소로 적어 주세요.");
+  const [address, lat, lng] = geo === "unavailable" ? [addrRaw, null, null] : [geo.address, geo.lat, geo.lng];
+
   const [org] = await sql`
-    INSERT INTO organizations (name, name_norm, org_type, biz_no, created_by)
-    VALUES (${name}, ${norm}, ${orgType}, ${normalizeBizNo(bizRaw)}, ${u.id}) RETURNING id`;
+    INSERT INTO organizations (name, name_norm, org_type, biz_no, address, lat, lng, created_by)
+    VALUES (${name}, ${norm}, ${orgType}, ${normalizeBizNo(bizRaw)}, ${address}, ${lat}, ${lng}, ${u.id}) RETURNING id`;
   await sql`UPDATE users SET org_id = ${org.id}, org_role = 'manager', org_status = 'verified' WHERE id = ${u.id}`;
   return Response.json({ orgId: org.id, role: "manager", bizChecked: biz.checked });
 });

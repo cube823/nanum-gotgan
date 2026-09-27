@@ -54,7 +54,7 @@ export const POST = api(async (req, { params }) => {
 
 ```bash
 pnpm typecheck && pnpm lint && pnpm build
-pnpm dev &  pnpm smoke      # 96건
+pnpm dev &  pnpm smoke      # 98건
 ```
 
 `.env.local`이 없으면 `.env.example`을 복사. `ADMIN_EMAILS`에 있는 이메일로 OAuth 로그인하면 운영자. 로그인 화면에 개발용 폼은 없다 — `dev` 프로바이더는 smoke가 curl로 `/api/auth/callback/dev`를 직접 부르는 데만 쓴다.

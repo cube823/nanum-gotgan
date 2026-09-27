@@ -39,3 +39,42 @@ INSERT INTO organizations (name, name_norm, org_type, address, verified) VALUES
   ('동작청년센터', '동작청년센터', '모름', '서울특별시 동작구 노량진로 140 노량진 청년일자리센터 메가스터디타워 2층', true),
   ('중랑청년청', '중랑청년청', '모름', '서울특별시 중랑구 중랑역로 159', true)
 ON CONFLICT (name_norm) DO NOTHING;
+
+-- 좌표 (카카오 로컬 API, 2026-09-27) — web/scripts/geocode-orgs.mjs가 만든다
+UPDATE organizations SET lat = 37.482307, lng = 126.945667 WHERE name_norm = '관악청년청';
+UPDATE organizations SET lat = 37.541332, lng = 127.063876 WHERE name_norm = '광진청년아지트';
+UPDATE organizations SET lat = 37.485302, lng = 126.840034 WHERE name_norm = '구로청년공간청년이룸';
+UPDATE organizations SET lat = 37.512757, lng = 126.941701 WHERE name_norm = '노량진청년일자리센터';
+UPDATE organizations SET lat = 37.627062, lng = 127.077101 WHERE name_norm = '노원청년일삶센터';
+UPDATE organizations SET lat = 37.653831, lng = 127.060178 WHERE name_norm = '노원구청년일자리센터청년내일';
+UPDATE organizations SET lat = 37.677952, lng = 127.055661 WHERE name_norm = '노원청년공유센터청년공감';
+UPDATE organizations SET lat = 37.654175, lng = 127.058520 WHERE name_norm = '노원청년정책거버넌스센터';
+UPDATE organizations SET lat = 37.668716, lng = 127.047131 WHERE name_norm = '도봉구청년취업지원센터';
+UPDATE organizations SET lat = 37.654540, lng = 127.049926 WHERE name_norm = '도봉구청년창업센터';
+UPDATE organizations SET lat = 37.512757, lng = 126.941701 WHERE name_norm = '동작청년센터';
+UPDATE organizations SET lat = 37.548844, lng = 126.910554 WHERE name_norm = '마포청년창업취업지원센터나루';
+UPDATE organizations SET lat = 37.628393, lng = 127.075703 WHERE name_norm = '문화살롱5120';
+UPDATE organizations SET lat = 37.541418, lng = 126.969373 WHERE name_norm = '서울광역청년센터';
+UPDATE organizations SET lat = 37.535793, lng = 127.122972 WHERE name_norm = '서울청년센터강동';
+UPDATE organizations SET lat = 37.647401, lng = 127.017372 WHERE name_norm = '서울청년센터강북';
+UPDATE organizations SET lat = 37.546245, lng = 126.836118 WHERE name_norm = '서울청년센터강서';
+UPDATE organizations SET lat = 37.470309, lng = 126.939066 WHERE name_norm = '서울청년센터관악청년문화공간신림동쓰리룸';
+UPDATE organizations SET lat = 37.552232, lng = 127.076537 WHERE name_norm = '서울청년센터광진';
+UPDATE organizations SET lat = 37.476190, lng = 126.883724 WHERE name_norm = '서울청년센터금천청춘삘딩';
+UPDATE organizations SET lat = 37.653831, lng = 127.060178 WHERE name_norm = '서울청년센터노원';
+UPDATE organizations SET lat = 37.653159, lng = 127.048745 WHERE name_norm = '서울청년센터도봉';
+UPDATE organizations SET lat = 37.590654, lng = 127.054569 WHERE name_norm = '서울청년센터동대문';
+UPDATE organizations SET lat = 37.550050, lng = 126.912061 WHERE name_norm = '서울청년센터마포';
+UPDATE organizations SET lat = 37.563506, lng = 127.042188 WHERE name_norm = '서울청년센터성동';
+UPDATE organizations SET lat = 37.594393, lng = 127.035444 WHERE name_norm = '서울청년센터성북';
+UPDATE organizations SET lat = 37.524591, lng = 126.877308 WHERE name_norm = '서울청년센터양천';
+UPDATE organizations SET lat = 37.522058, lng = 126.895287 WHERE name_norm = '서울청년센터영등포';
+UPDATE organizations SET lat = 37.610713, lng = 126.928456 WHERE name_norm = '서울청년센터은평';
+UPDATE organizations SET lat = 37.561690, lng = 126.974239 WHERE name_norm = '서울청년센터중구';
+UPDATE organizations SET lat = 37.484619, lng = 127.031300 WHERE name_norm = '서초청년센터서울청년센터서초';
+UPDATE organizations SET lat = 37.563506, lng = 127.042188 WHERE name_norm = '성동구청년지원센터';
+UPDATE organizations SET lat = 37.526906, lng = 126.966566 WHERE name_norm = '용산청년지음';
+UPDATE organizations SET lat = 37.569000, lng = 126.969342 WHERE name_norm = '종로청년창업센터';
+UPDATE organizations SET lat = 37.607562, lng = 127.076421 WHERE name_norm = '중랑청년청';
+UPDATE organizations SET lat = 37.605743, lng = 127.023926 WHERE name_norm = '청년공간길이음';
+UPDATE organizations SET lat = 37.597353, lng = 127.015043 WHERE name_norm = '청년공간동선이음';

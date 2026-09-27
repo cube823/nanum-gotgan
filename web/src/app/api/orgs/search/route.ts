@@ -9,7 +9,7 @@ export const GET = api(async (req) => {
   if (q.length < 1) return Response.json([]);
   const norm = normalizeOrgName(q);
   const rows = await sql`
-    SELECT id, name, org_type, verified FROM organizations
+    SELECT id, name, org_type, address, verified FROM organizations
     WHERE name_norm LIKE ${"%" + norm + "%"} OR name ILIKE ${"%" + q + "%"}
     ORDER BY verified DESC, name
     LIMIT 10`;

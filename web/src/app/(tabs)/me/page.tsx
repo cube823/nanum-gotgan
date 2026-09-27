@@ -5,10 +5,10 @@ import { ItemGrid } from "@/components/ItemGrid";
 import { WithdrawButton } from "./WithdrawButton";
 import { SignOutButton } from "./SignOutButton";
 
-const TABS = { registered: "등록", requested: "신청", received: "수령" } as const;
+const TABS = { registered: "등록", requested: "신청", received: "수령", bookmarks: "북마크" } as const;
 type Tab = keyof typeof TABS;
 
-// 화면 12 — 05 기획서. 프로필 + 등록/신청/수령. 등록에 내리기.
+// 화면 12 — 05 기획서. 프로필 + 등록/신청/수령/북마크. 등록에 내리기. 북마크는 스와이프 하트로 쌓인다.
 export default async function MePage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const u = await requireUser();
   const { tab: raw } = await searchParams;
@@ -71,7 +71,7 @@ export default async function MePage({ searchParams }: { searchParams: Promise<{
             ))}
           </ul>
         ) : (
-          <ItemGrid items={items} empty={tab === "requested" ? "신청한 물품이 없어요." : "받은 물품이 없어요."} />
+          <ItemGrid items={items} empty={{ requested: "신청한 물품이 없어요.", received: "받은 물품이 없어요.", bookmarks: "하트를 누른 물품이 여기에 모여요." }[tab]} />
         )}
       </div>
 

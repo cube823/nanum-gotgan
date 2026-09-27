@@ -34,6 +34,7 @@ src/app/api/**          route handler. 전부 api() 래퍼 안에서 HttpError�
 src/app/(tabs)/         4탭 + 목록. layout.tsx가 pending 배너와 TabBar
 src/components/         ItemGrid, TabBar
 scripts/smoke.sh        curl 한 바퀴. 기능 추가 시 여기에 케이스
+scripts/geocode-orgs.mjs 기관 주소→좌표(카카오 로컬). 결과 UPDATE문을 db/orgs.sql 끝에 붙인다. KAKAO_REST_KEY 필요
 ```
 
 ## API 라우트를 추가할 때
@@ -53,7 +54,7 @@ export const POST = api(async (req, { params }) => {
 
 ```bash
 pnpm typecheck && pnpm lint && pnpm build
-pnpm dev &  pnpm smoke      # 78건
+pnpm dev &  pnpm smoke      # 96건
 ```
 
-`.env.local`이 없으면 `.env.example`을 복사. `ADMIN_EMAILS`의 이메일로 dev 로그인하면 운영자.
+`.env.local`이 없으면 `.env.example`을 복사. `ADMIN_EMAILS`에 있는 이메일로 OAuth 로그인하면 운영자. 로그인 화면에 개발용 폼은 없다 — `dev` 프로바이더는 smoke가 curl로 `/api/auth/callback/dev`를 직접 부르는 데만 쓴다.

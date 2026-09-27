@@ -66,3 +66,15 @@ export async function checkBizNo(raw: string): Promise<BizStatus> {
     return { ok: true, checked: false };              // 타임아웃·네트워크 실패도 마찬가지
   }
 }
+
+/** 기관에 대조할 번호. 기관에 번호가 저장돼 있으면(직접 등록된 기관) 같아야 한다.
+ *  시드된 청년센터(db/orgs.sql)는 번호가 없어 상태조회만 본다 — matched=false. */
+export async function checkBizNoFor(
+  raw: string, expected: string | null,
+): Promise<{ ok: true; matched: boolean } | { ok: false; reason: string }> {
+  const r = await checkBizNo(raw);
+  if (!r.ok) return r;
+  if (!expected) return { ok: true, matched: false };
+  if (normalizeBizNo(raw) !== expected) return { ok: false, reason: "기관에 등록된 사업자등록번호와 달라요." };
+  return { ok: true, matched: true };
+}

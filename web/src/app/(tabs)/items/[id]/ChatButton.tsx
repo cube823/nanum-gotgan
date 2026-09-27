@@ -23,7 +23,7 @@ export function ChatButton({ itemId, verified, reserved }: { itemId: string; ver
 
   return (
     <div>
-      <button onClick={go} disabled={busy} className="btn-brand w-full">
+      <button onClick={go} disabled={busy} className="btn-cta">
         {reserved ? "예약된 물품이에요 — 그래도 채팅하기" : "채팅하기"}
       </button>
       {err && <p className="mt-2 text-xs text-accent text-center">{err}</p>}

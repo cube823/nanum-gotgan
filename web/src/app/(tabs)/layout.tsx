@@ -2,7 +2,7 @@ import Link from "next/link";
 import { currentUser } from "@/lib/session";
 import { TabBar } from "@/components/TabBar";
 
-export default async function TabsLayout({ children }: { children: React.ReactNode }) {
+export default async function TabsLayout({ children, modal }: { children: React.ReactNode; modal: React.ReactNode }) {
   const u = await currentUser();
   return (
     <>
@@ -12,6 +12,7 @@ export default async function TabsLayout({ children }: { children: React.ReactNo
         </Link>
       )}
       <div className="flex-1 flex flex-col pb-16">{children}</div>
+      {modal}
       <TabBar canApprove={!!u && (u.isAdmin || (u.orgRole === "manager" && u.orgStatus === "verified"))} />
     </>
   );

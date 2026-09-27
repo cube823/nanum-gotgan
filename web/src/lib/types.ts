@@ -59,4 +59,10 @@ export type ItemCard = Item & {
   photos: string[];
   categoryLabel: string;
   riskLevel: Risk;
+  // ↓ 스와이프 피드에서만 채운다 (lib/items.ts swipeFeed)
+  bookmarked?: boolean;
+  bookmarkCount?: number;
+  chatCount?: number;      // 취소 안 된 나눔 요청 = 열린 채팅방 수
+  orgAddress?: string | null;
+  distanceKm?: number | null;   // 물품 기관 ↔ 내 기관 직선거리. 좌표 없으면 null
 };

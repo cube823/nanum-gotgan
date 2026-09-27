@@ -41,6 +41,8 @@ export default function PendingPage() {
         </p>
       </div>
       <div className="space-y-2">
+        {/* 전체 새로고침 이동이 의도다 — 13498a7에서 router.push를 이걸로 바꿨다 */}
+        {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
         <a href="/swipe" className="btn-brand w-full">물품 둘러보기</a>
         <button onClick={() => signOut({ callbackUrl: "/login" })} className="btn-ghost w-full">로그아웃</button>
       </div>

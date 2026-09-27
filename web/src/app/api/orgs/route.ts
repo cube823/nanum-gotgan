@@ -1,13 +1,13 @@
 import { sql } from "@/lib/db";
 import { api, requireUser, HttpError } from "@/lib/session";
 import { normalizeOrgName } from "@/lib/org";
-import { checkBizNo, normalizeBizNo } from "@/lib/bizno";
+import { checkBizNo, checkBizNoFor, normalizeBizNo } from "@/lib/bizno";
 
 const ORG_TYPES = new Set(["위탁", "직영", "모름"]);
 
 /**
  * 소속 정하기. DB-SCHEMA §1.5.
- *  { orgId }                      → 기존 기관에 member로 합류
+ *  { orgId, bizNo }               → 기존 기관에 member로 합류 (번호가 저장된 기관이면 대조)
  *  { name, orgType, bizNo }       → 새 기관 생성 + 만든 사람이 manager
  *
  * 둘 다 바로 verified다 — 기획 정의서(Figma)에 승인 단계가 없다. 가입 4단계가 끝나면
@@ -25,8 +25,13 @@ export const POST = api(async (req) => {
   const body = await req.json();
 
   if (body.orgId) {
-    const [org] = await sql`SELECT id FROM organizations WHERE id = ${body.orgId}`;
+    const [org] = await sql`SELECT id, biz_no FROM organizations WHERE id = ${body.orgId}`;
     if (!org) throw new HttpError(404, "기관을 찾을 수 없어요.");
+    // 합류도 번호를 받는다 — 목록에서 고르기만 하면 아무 기관에나 들어갈 수 있었다.
+    const joinBiz = String(body.bizNo ?? "").trim();
+    if (!joinBiz) throw new HttpError(400, "사업자등록번호를 적어 주세요.");
+    const check = await checkBizNoFor(joinBiz, org.bizNo);
+    if (!check.ok) throw new HttpError(400, check.reason);
     await sql`UPDATE users SET org_id = ${org.id}, org_role = 'member', org_status = 'verified' WHERE id = ${u.id}`;
     return Response.json({ orgId: org.id, role: "member" });
   }

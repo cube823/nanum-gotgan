@@ -19,13 +19,13 @@ cd .. && pnpm install && cd web
 pnpm dev                                       # http://localhost:3000  (루트에서 `pnpm dev`도 같다)
 ```
 
-개발 중엔 OAuth 클라이언트 ID 없이 **개발용 로그인**(이메일만 입력)으로 전체 흐름을 돌릴 수 있다.
+로그인은 개발 중에도 구글·카카오 OAuth로 한다 (`.env.local`에 클라이언트 ID). 이메일만 받는 `dev` 프로바이더는 화면에 없고 `pnpm smoke`가 curl로만 쓴다.
 프로덕션 빌드에선 이 로그인이 사라지고 구글/카카오만 남는다 — `AUTH_GOOGLE_ID`, `AUTH_KAKAO_ID`가 필요하다.
 
 ## 확인
 
 ```bash
-pnpm smoke                     # dev 서버 떠 있을 때. 계정 3개로 한 바퀴 (78건)
+pnpm smoke                     # dev 서버 떠 있을 때. 계정 3개로 한 바퀴 (96건)
 pnpm typecheck
 pnpm lint
 pnpm build

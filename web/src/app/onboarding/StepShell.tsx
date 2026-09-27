@@ -17,17 +17,17 @@ export function StepShell({
         {onBack && (
           <button
             type="button" onClick={onBack} aria-label="이전 단계"
-            className="absolute left-2 size-10 grid place-items-center text-xl text-neutral-500">
+            className="absolute left-2 size-10 grid place-items-center text-2xl text-neutral-900">
             ‹
           </button>
         )}
-        <h2 className="text-sm font-semibold">{title}</h2>
-        <span className="absolute right-4 text-xs text-neutral-400">{step}/3</span>
+        <h2 className="text-base font-bold">{title}</h2>
+        <span className="absolute right-6 text-sm text-neutral-400">{step}/3</span>
       </header>
 
-      <div className="flex gap-1.5 px-6" aria-hidden>
+      <div className="mt-2 flex gap-1.5 px-6" aria-hidden>
         {[1, 2, 3].map((i) => (
-          <span key={i} className={`h-1 flex-1 rounded-full ${i <= step ? "bg-brand" : "bg-neutral-200"}`} />
+          <span key={i} className={`h-1 flex-1 ${i <= step ? "bg-brand" : "bg-neutral-200"}`} />
         ))}
       </div>
 

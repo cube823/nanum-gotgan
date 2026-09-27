@@ -18,7 +18,7 @@ export default async function OnboardingPage() {
   return (
     <OnboardingFlow
       categories={cats}
-      profile={{ realName: u.realName ?? "", phone: u.phone ?? "" }}
+      profile={{ realName: u.realName ?? "", phone: u.phone ?? "", hasOrg: !!u.orgId }}
     />
   );
 }

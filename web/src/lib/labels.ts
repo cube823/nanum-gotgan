@@ -10,3 +10,19 @@ export const CONDITION_LABEL: Record<Condition, string> = {
   중: "거의 새것",
   하: "사용감 있음",
 };
+
+/** "2일 전 등록" 같은 상대 시각. 기획 정의서 11 상세. 한 달 넘으면 날짜로. */
+export function ago(d: Date | string): string {
+  const s = (Date.now() - new Date(d).getTime()) / 1000;
+  if (s < 60) return "방금";
+  if (s < 3600) return `${Math.floor(s / 60)}분 전`;
+  if (s < 86400) return `${Math.floor(s / 3600)}시간 전`;
+  if (s < 86400 * 30) return `${Math.floor(s / 86400)}일 전`;
+  return ymd(d);
+}
+
+/** 2026.09.27 */
+export function ymd(d: Date | string): string {
+  const x = new Date(d);
+  return `${x.getFullYear()}.${String(x.getMonth() + 1).padStart(2, "0")}.${String(x.getDate()).padStart(2, "0")}`;
+}

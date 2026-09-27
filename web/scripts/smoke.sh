@@ -33,6 +33,8 @@ jget()   { python3 -c "import sys,json; print(json.load(sys.stdin)['$1'])"; }
 has()    { python3 -c "import sys,json; print(any(i['id']=='$1' for i in json.load(sys.stdin)))"; }
 count()  { python3 -c "import sys,json; print(len(json.load(sys.stdin)))"; }
 first()  { python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0]['id'] if d else '')"; }
+dist()   { python3 -c "import sys,json; print(next((i.get('distanceKm') for i in json.load(sys.stdin) if i['id']=='$1'), 'missing'))"; }
+marked() { python3 -c "import sys,json; print(next((i.get('bookmarked') for i in json.load(sys.stdin) if i['id']=='$1'), None))"; }
 
 A=$J/a B=$J/b ADM=$J/adm
 SUF=$RANDOM
@@ -63,6 +65,9 @@ ORG_B="{\"name\":\"테스트 청년센터 B$SUF\",\"orgType\":\"모름\",\"bizNo
 expect "번호 없이 400"  "400" "$(api "$A" POST /api/orgs "$NO_BIZ" | status)"
 expect "체크디지트 400" "400" "$(api "$A" POST /api/orgs "$BAD_BIZ" | status)"
 expect "0반복 400"      "400" "$(api "$A" POST /api/orgs "$ZERO_BIZ" | status)"
+BIZ_BAD='{"bizNo":"1234567890"}'; BIZ_OK='{"bizNo":"309-81-00129"}'
+expect "인증하기 틀린번호 400" "400" "$(api "$A" POST /api/orgs/bizno "$BIZ_BAD" | status)"
+expect "인증하기 맞는번호 200" "200" "$(api "$A" POST /api/orgs/bizno "$BIZ_OK" | status)"
 api "$A" POST /api/orgs "$ORG_A" >/dev/null
 api "$B" POST /api/orgs "$ORG_B" >/dev/null
 expect "A 바로 verified" "verified" "$(api "$A" GET /api/me | body | jget orgStatus)"
@@ -74,7 +79,13 @@ DUP="{\"name\":\"테스트청년센터A$SUF\",\"orgType\":\"직영\",\"bizNo\":\
 expect "중복 기관명 409" "409" "$(api "$D" POST /api/orgs "$DUP" | status)"
 # 기존 기관 합류 경로도 바로 verified여야 한다 — 신규 생성만 보면 이 분기를 놓친다
 AORG=$(api "$A" GET /api/me | body | python3 -c "import sys,json; print(json.load(sys.stdin)['org']['id'])")
-JOIN="{\"orgId\":\"$AORG\"}"
+JOIN_NOBIZ="{\"orgId\":\"$AORG\"}"
+JOIN_WRONG="{\"orgId\":\"$AORG\",\"bizNo\":\"309-81-00342\"}"
+JOIN="{\"orgId\":\"$AORG\",\"bizNo\":\"309-81-00129\"}"
+expect "합류 번호 없이 400"     "400" "$(api "$D" POST /api/orgs "$JOIN_NOBIZ" | status)"
+expect "합류 번호 불일치 400"   "400" "$(api "$D" POST /api/orgs "$JOIN_WRONG" | status)"
+BIZ_MATCH="{\"orgId\":\"$AORG\",\"bizNo\":\"3098100129\"}"
+expect "인증하기 기관 대조 matched" "True" "$(api "$D" POST /api/orgs/bizno "$BIZ_MATCH" | body | jget matched)"
 expect "기존 기관 합류 200"   "200"      "$(api "$D" POST /api/orgs "$JOIN" | status)"
 expect "합류도 바로 verified" "verified" "$(api "$D" GET /api/me | body | jget orgStatus)"
 expect "합류는 member"        "member"   "$(api "$D" GET /api/me | body | jget orgRole)"
@@ -137,6 +148,30 @@ expect "관심(interior)이 1번" "$INT_ID" "$(api "$B" GET /api/items | body | 
 # A는 관심을 stationery 포함으로 골랐지만 둘 다 자기 기관 것이라 안 보인다 — 정렬이 소속 규칙을 뚫지 않는다.
 expect "A 피드엔 자기 것 없음" "False" "$(api "$A" GET /api/items | body | has $OFF_ID)"
 
+echo "5c. 북마크 — 하트 켜기/끄기, 프로필 > 북마크"
+expect "처음엔 꺼짐"        "False" "$(api "$B" GET /api/items | body | marked $INT_ID)"
+expect "켜기 200"           "200"   "$(api "$B" PUT "/api/items/$INT_ID/bookmark" | status)"
+expect "두 번 켜도 200"     "200"   "$(api "$B" PUT "/api/items/$INT_ID/bookmark" | status)"
+expect "피드에 켜짐"        "True"  "$(api "$B" GET /api/items | body | marked $INT_ID)"
+expect "끄기 200"           "200"   "$(api "$B" DELETE "/api/items/$INT_ID/bookmark" | status)"
+expect "피드에 꺼짐"        "False" "$(api "$B" GET /api/items | body | marked $INT_ID)"
+expect "없는 물품 404"      "404"   "$(api "$B" PUT "/api/items/00000000-0000-0000-0000-000000000000/bookmark" | status)"
+api "$B" PUT "/api/items/$INT_ID/bookmark" >/dev/null   # 아래 /me?tab=bookmarks 화면에 한 건 남긴다
+
+echo "5d. 거리 — 시드 기관 좌표로 직선거리 (db/orgs.sql)"
+# 강동 ↔ 마포 = 18.7km (psql 하버사인으로 확인한 값). 좌표 없는 테스트 기관(B)이 보면 null.
+orgid() { python3 -c "import sys,json; print(next(o['id'] for o in json.load(sys.stdin) if o['name']=='$1'))"; }
+E=$J/e F=$J/f
+login "$E" "e$SUF@dev.local" "강동 담당"; login "$F" "f$SUF@dev.local" "마포 담당"
+GD=$(api "$E" GET "/api/orgs/search?q=%EA%B0%95%EB%8F%99" | body | orgid "서울청년센터 강동")
+MP=$(api "$F" GET "/api/orgs/search?q=%EB%A7%88%ED%8F%AC" | body | orgid "서울청년센터 마포")
+JOIN_GD="{\"orgId\":\"$GD\",\"bizNo\":\"3098100129\"}"; JOIN_MP="{\"orgId\":\"$MP\",\"bizNo\":\"3098100129\"}"
+api "$E" POST /api/orgs "$JOIN_GD" >/dev/null; api "$F" POST /api/orgs "$JOIN_MP" >/dev/null
+GD_ITEM_BODY="{\"category\":\"packaging\",\"name\":\"거리 확인용 박스\",\"quantity\":1,\"condition\":\"중\",\"isUsed\":true,\"photos\":[\"$URL\"]}"
+GD_ITEM=$(api "$E" POST /api/items "$GD_ITEM_BODY" | body | jget id)
+expect "마포에서 본 강동 물품 18.7km" "18.7" "$(api "$F" GET /api/items | body | dist $GD_ITEM)"
+expect "좌표 없는 기관이 보면 null"   "None" "$(api "$B" GET /api/items | body | dist $GD_ITEM)"
+
 echo "6. 채팅 시작"
 expect "A 자기 기관 물품 신청 400" "400" "$(api "$A" POST /api/transfers "$SW" | status)"
 T=$(api "$B" POST /api/transfers "$SW" | body | jget id)
@@ -193,11 +228,14 @@ expect "완료된 방에 새 메시지도 400" "400" "$(api "$B" POST "/api/tran
 expect "완료된 물품 내리기 400" "400" "$(api "$A" PATCH "/api/items/$ITEM" '{"action":"withdraw"}' | status)"
 
 echo "9. 페이지 렌더 (200)"
-for p in /swipe /items "/items/$ITEM" /new /messages "/messages/$T" /me "/me?tab=received"; do
+BID=$(api "$B" GET /api/me | body | jget id)
+for p in /swipe /items "/items/$ITEM" /new /messages "/messages/$T" /me "/me?tab=received" "/me?tab=bookmarks" "/users/$BID"; do
   expect "GET $p" "200" "$(curl -s -o /dev/null -b "$A" -w '%{http_code}' "$BASE$p")"
 done
 expect "GET /admin/approvals (운영자)" "200" "$(curl -s -o /dev/null -b "$ADM" -w '%{http_code}' "$BASE/admin/approvals")"
 expect "GET /admin/approvals (B, manager verified) 200" "200" "$(curl -s -o /dev/null -b "$B" -w '%{http_code}' "$BASE/admin/approvals")"
+expect "없는 사용자 프로필 404" "404" "$(curl -s -o /dev/null -b "$A" -w '%{http_code}' "$BASE/users/00000000-0000-0000-0000-000000000000")"
+expect "uuid 아닌 프로필 404"   "404" "$(curl -s -o /dev/null -b "$A" -w '%{http_code}' "$BASE/users/abc")"
 expect "GET / 미로그인 → /login" "307" "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/")"
 
 echo

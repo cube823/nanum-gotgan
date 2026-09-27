@@ -33,7 +33,7 @@ export const POST = api(async (req) => {
   const history = String(b.history ?? "").trim() || null;   // 선택. 단답형
   if (history && history.length > 200) throw new HttpError(400, "물품 히스토리는 200자 이하로 적어 주세요.");
 
-  // 거래 희망 장소 (선택). 좌표는 /api/geocode가 준 값 — 한국 범위 밖이면 받지 않는다. 비우면 기관 위치를 쓴다.
+  // 거래 희망 장소 (선택). 좌표는 위치 변경(/api/places·지도 핀)이 준 값 — 한국 범위 밖이면 받지 않는다. 비우면 기관 위치를 쓴다.
   const pickupPlace = String(b.pickupPlace ?? "").trim().slice(0, 100) || null;
   const pickupAddress = String(b.pickupAddress ?? "").trim().slice(0, 200) || null;
   const [pLat, pLng] = [Number(b.pickupLat), Number(b.pickupLng)];

@@ -173,10 +173,13 @@ expect "관심(interior)이 1번" "$INT_ID" "$(api "$B" GET /api/items | body | 
 expect "A 피드엔 자기 것 없음" "False" "$(api "$A" GET /api/items | body | has $OFF_ID)"
 
 echo "5b-2. 거래 희망 장소 — 주소 찾기, 저장, 거리 기준 (기획 정의서 82-26)"
-GEO_OK='{"address":"서울특별시 강동구 올림픽로 610"}'; GEO_BAD='{"address":"없는나라 없는길 99999"}'
-expect "주소 찾기 200"      "200" "$(api "$A" POST /api/geocode "$GEO_OK" | status)"
-expect "못 찾는 주소 400"   "400" "$(api "$A" POST /api/geocode "$GEO_BAD" | status)"
-GLAT=$(api "$A" POST /api/geocode "$GEO_OK" | body | jget lat); GLNG=$(api "$A" POST /api/geocode "$GEO_OK" | body | jget lng)
+# 도로명 주소를 몰라도 장소 이름으로 찾는다 — "강동 청년센터" 같은 검색어로 후보를 받고, 고른 후보의 좌표를 쓴다
+first_ll() { python3 -c "import sys,json; d=json.load(sys.stdin); print(f\"{d[0]['lat']} {d[0]['lng']}\" if d else '')"; }
+expect "장소 검색 결과 있음" "True" "$(api "$A" GET "/api/places?q=%ED%95%A9%EC%A0%95%EC%97%AD" | body | python3 -c 'import sys,json; print(len(json.load(sys.stdin))>0)')"
+expect "한 글자는 빈 목록"   "0"    "$(api "$A" GET "/api/places?q=a" | body | count)"
+read GLAT GLNG <<< "$(api "$A" GET "/api/places?q=%EC%84%9C%EC%9A%B8%ED%8A%B9%EB%B3%84%EC%8B%9C%20%EA%B0%95%EB%8F%99%EA%B5%AC%20%EC%98%AC%EB%A6%BC%ED%94%BD%EB%A1%9C%20610" | body | first_ll)"
+expect "핀 → 주소"           "True" "$(api "$A" GET "/api/places/reverse?lat=$GLAT&lng=$GLNG" | body | python3 -c 'import sys,json; print("강동구" in (json.load(sys.stdin)["address"] or ""))')"
+expect "한국 밖 핀 400"      "400"  "$(api "$A" GET "/api/places/reverse?lat=0&lng=0" | status)"
 PICK="{\"category\":\"packaging\",\"name\":\"장소 지정 박스\",\"quantity\":1,\"condition\":\"중\",\"isUsed\":true,\"photos\":[\"$URL\"],\"pickupPlace\":\"강동 창고\",\"pickupAddress\":\"서울 강동구 올림픽로 610\",\"pickupLat\":$GLAT,\"pickupLng\":$GLNG}"
 PICK_ID=$(api "$A" POST /api/items "$PICK" | body | jget id)
 expect "거래 장소 저장" "강동 창고" "$(api "$B" GET "/api/items/$PICK_ID" | body | jget pickupPlace)"

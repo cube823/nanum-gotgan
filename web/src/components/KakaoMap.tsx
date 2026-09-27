@@ -11,7 +11,7 @@ const KEY = process.env.NEXT_PUBLIC_KAKAO_MAP_KEY;
 let loading: Promise<any> | null = null;
 
 /** SDK는 한 번만 붙인다. autoload=false + kakao.maps.load — Next가 스크립트 순서를 보장하지 않아서. */
-function loadSdk(): Promise<any> {
+export function loadSdk(): Promise<any> {
   if (window.kakao?.maps?.LatLng) return Promise.resolve(window.kakao);
   loading ??= new Promise((resolve, reject) => {
     const s = document.createElement("script");

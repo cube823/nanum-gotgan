@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { Category } from "@/lib/types";
 import { CONDITION_LABEL, CONDITIONS } from "@/lib/labels";
 import { KakaoMap } from "@/components/KakaoMap";
+import { PlacePicker } from "@/components/PlacePicker";
 
 /** 등록하기 — 기획 정의서 58-156·157(사진 선택) + 82-25·26(게시물 내용 등록), decisions/0010.
  *
@@ -41,8 +42,7 @@ export function NewItemForm({ categories, org, userId }: { categories: Category[
   const [busy, setBusy] = useState(false);
   const [f, setF] = useState<Form>(EMPTY);
   const [place, setPlace] = useState<Place>({ name: org.name, address: org.address, lat: org.lat, lng: org.lng });
-  const [editPlace, setEditPlace] = useState(false);
-  const [addrInput, setAddrInput] = useState("");
+  const [picking, setPicking] = useState(false);       // 위치 변경 — 전체 화면 장소 선택기
   const previews = useRef<string[]>([]);
   const dragId = useRef<string | null>(null);
 
@@ -116,15 +116,6 @@ export function NewItemForm({ categories, org, userId }: { categories: Category[
       next.splice(o.indexOf(over), 0, from);
       return next;
     });
-  }
-
-  async function findPlace() {
-    setErr(null);
-    const r = await fetch("/api/geocode", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ address: addrInput }) });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) { setErr(j.error ?? "주소를 찾지 못했어요."); return; }
-    setPlace((p) => ({ ...p, address: j.address, lat: j.lat, lng: j.lng }));
-    setEditPlace(false);
   }
 
   function saveDraft() {
@@ -316,48 +307,55 @@ export function NewItemForm({ categories, org, userId }: { categories: Category[
               <span className="block truncate text-sm font-bold">{place.name}</span>
               {place.address && <span className="block truncate text-xs text-neutral-400">{place.address}</span>}
             </span>
-            <button type="button" onClick={() => { setEditPlace((v) => !v); setAddrInput(place.address ?? ""); }}
-              className="shrink-0 text-sm font-semibold text-brand">위치 변경</button>
+            <button type="button" onClick={() => setPicking(true)} className="shrink-0 text-sm font-semibold text-brand">위치 변경</button>
           </div>
-          {editPlace && (
-            <div className="space-y-2 border-t border-neutral-200 px-4 py-3">
-              <input className="field" value={place.name} onChange={(e) => setPlace((p) => ({ ...p, name: e.target.value }))}
-                placeholder="장소 이름 (예: 용산 청년지음 1층 나눔곳간)" aria-label="장소 이름" />
-              <div className="flex gap-2">
-                <input className="field" value={addrInput} onChange={(e) => setAddrInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void findPlace(); } }}
-                  placeholder="도로명 주소" aria-label="도로명 주소" />
-                <button type="button" onClick={findPlace} disabled={addrInput.trim().length < 5}
-                  className="btn h-13 shrink-0 rounded-2xl bg-brand/10 px-4 text-sm text-brand">찾기</button>
-              </div>
-            </div>
-          )}
         </div>
 
         <label htmlFor="hist" className={`${label} mt-6`}>물품 히스토리 <span className="font-normal text-neutral-400">(선택)</span></label>
         <input id="hist" className="field" value={f.history} maxLength={200} onChange={(e) => set("history", e.target.value)}
           placeholder="어떤 히스토리가 있는지 간단하게 작성해주세요." />
 
-        {/* 법적 필드 — Figma엔 없지만 법적 검토 §5. 사람이 입력한다(AGENTS 불변 4). 🔴면 펼쳐서 강제 */}
-        <details open={red} className="mt-6 rounded-2xl bg-neutral-100/70 p-4">
-          <summary className="cursor-pointer text-sm font-bold">관리 정보 {red ? "(필수)" : "(선택)"}</summary>
-          <div className="mt-3 space-y-3 text-sm">
-            <label className="flex items-center gap-2">
-              <input type="checkbox" checked={f.onLedger} onChange={(e) => set("onLedger", e.target.checked)} />
-              물품 대장에 등재된 물품이에요
-            </label>
-            <label className="flex items-center gap-2">
-              <input type="checkbox" checked={f.approvalConfirmed} onChange={(e) => set("approvalConfirmed", e.target.checked)} />
-              내부 처분 승인을 받았어요{red && <span className="text-accent">*</span>}
-            </label>
-            <div>
-              <label htmlFor="fund" className="mb-1 block text-neutral-600">취득 재원</label>
-              <select id="fund" className="field" value={f.fundingSource} onChange={(e) => set("fundingSource", e.target.value)}>
-                <option value="">모름</option><option>자체예산</option><option>보조금</option><option>기타</option>
-              </select>
-            </div>
-          </div>
-        </details>
+        {/* 관리 정보 — Figma엔 없지만 법적 검토 §5의 기록 항목(MVP 첫 커밋부터). 사람이 입력한다(AGENTS 불변 4).
+            🔴(전기·소형비품)는 처분 승인이 있어야 등록된다 — 화면·API·DB CHECK 3중 */}
+        <p className={`${label} mt-8`}>
+          관리 정보 {red ? <span className="font-normal text-accent">(필수)</span> : <span className="font-normal text-neutral-400">(선택)</span>}
+        </p>
+        <p className="-mt-1 mb-3 text-xs leading-relaxed text-neutral-400">
+          공공 예산으로 산 물품은 나눔 기록이 필요해요. 모르면 비워 둬도 돼요.
+        </p>
+        <div className="space-y-2">
+          {([
+            ["onLedger", "물품 대장에 등재된 물품이에요", "기관 물품 대장에 올라 있는 물품", false],
+            ["approvalConfirmed", "내부 처분 승인을 받았어요", "기관에서 나눔(처분)을 승인받음", red],
+          ] as const).map(([k, title, sub, must]) => {
+            const on = f[k];
+            return (
+              <button key={k} type="button" role="checkbox" aria-checked={on} onClick={() => set(k, !on)}
+                className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left transition ${
+                  on ? "border-brand bg-brand/5" : must ? "border-accent/40" : "border-neutral-200"}`}>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold text-neutral-900">
+                    {title}{must && <span className="ml-1 text-xs font-bold text-accent">필수</span>}
+                  </span>
+                  <span className="block text-xs text-neutral-400">{sub}</span>
+                </span>
+                <span aria-hidden className={`size-6 shrink-0 rounded-full grid place-items-center ${on ? "bg-brand text-white" : "border-2 border-neutral-300"}`}>
+                  {on && <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-4 mb-2 text-sm font-semibold text-neutral-700">취득 재원</p>
+        <div className="flex gap-2">
+          {(["자체예산", "보조금", "기타", "모름"] as const).map((v) => {
+            const on = (f.fundingSource || "모름") === v;
+            return (
+              <button key={v} type="button" onClick={() => set("fundingSource", v === "모름" ? "" : v)} aria-pressed={on}
+                className={`${pill(on)} flex-1 px-2`}>{v}</button>
+            );
+          })}
+        </div>
 
         {err && <p className="mt-4 text-center text-sm text-accent">{err}</p>}
       </div>
@@ -365,6 +363,12 @@ export function NewItemForm({ categories, org, userId }: { categories: Category[
       <div className="shrink-0 px-5 pt-3 pb-[calc(16px+env(safe-area-inset-bottom))]">
         <button onClick={submit} disabled={!canSubmit || busy} className="btn-cta">작성완료</button>
       </div>
+
+      {picking && (
+        <PlacePicker initial={place} home={{ name: org.name, address: org.address, lat: org.lat, lng: org.lng }}
+          onCancel={() => setPicking(false)}
+          onDone={(p) => { setPlace(p); setPicking(false); }} />
+      )}
     </main>
   );
 }

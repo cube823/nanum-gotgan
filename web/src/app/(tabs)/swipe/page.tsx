@@ -167,6 +167,12 @@ function CardFace({ card, photoIdx, children }: { card: ItemCard; photoIdx: numb
     <div className="relative size-full rounded-3xl overflow-hidden bg-neutral-100 shadow-sm">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       {card.photos[photoIdx] && <img src={card.photos[photoIdx]} alt={card.name} draggable={false} className="absolute inset-0 size-full object-cover pointer-events-none" />}
+      {card.photos.length === 0 && (
+        <span className="absolute inset-x-0 top-1/3 flex flex-col items-center gap-2 text-sm text-neutral-400 pointer-events-none">
+          <svg aria-hidden viewBox="0 0 24 24" className="size-10" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round"><rect x="4" y="4" width="16" height="16" rx="2.5" /><circle cx="9" cy="9.5" r="1.6" /><path d="m5 17 4.5-4.5 3 3 2.5-2.5L19 17" /></svg>
+          사진이 아직 없어요
+        </span>
+      )}
       {/* 사진 장수 (기획 정의서 09: ▬ • •, 현재 사진이 긴 막대). 1장이면 넘길 게 없어 숨긴다 */}
       {card.photos.length > 1 && (
         <div className="absolute top-3 inset-x-0 flex justify-center gap-1 pointer-events-none">

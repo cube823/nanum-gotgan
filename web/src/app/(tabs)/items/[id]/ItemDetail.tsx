@@ -41,6 +41,8 @@ export async function ItemDetail({ id, sheet = false }: { id: string; sheet?: bo
       {/* 기획 정의서 11 — 맨 위 사진(390:300). 시트면 오른쪽 위 ↓로 내리고, 직접 들어온 전체 화면이면 ← 뒤로. */}
       <div className="relative">
         <div className="flex overflow-x-auto snap-x snap-mandatory">
+          {/* 사진이 없으면 자리만 둔다 — 없애면 ↓·← 버튼이 본문 위에 겹친다 */}
+          {item.photos.length === 0 && <PhotoPlaceholder />}
           {item.photos.map((p) => (
             // eslint-disable-next-line @next/next/no-img-element
             <img key={p} src={p} alt="" className="w-full aspect-[13/10] object-cover snap-center shrink-0" />
@@ -153,5 +155,16 @@ export async function ItemDetail({ id, sheet = false }: { id: string; sheet?: bo
         </div>
       </div>
     </article>
+  );
+}
+
+function PhotoPlaceholder() {
+  return (
+    <div className="w-full aspect-[13/10] shrink-0 bg-neutral-100 grid place-items-center text-neutral-400">
+      <span className="flex flex-col items-center gap-2 text-sm">
+        <svg aria-hidden viewBox="0 0 24 24" className="size-9" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round"><rect x="4" y="4" width="16" height="16" rx="2.5" /><circle cx="9" cy="9.5" r="1.6" /><path d="m5 17 4.5-4.5 3 3 2.5-2.5L19 17" /></svg>
+        사진이 아직 없어요
+      </span>
+    </div>
   );
 }

@@ -44,6 +44,10 @@ export type Item = {
   name: string;
   description: string | null;
   history: string | null;
+  pickupPlace: string | null;     // 거래 희망 장소. 비면 등록 기관 위치
+  pickupAddress: string | null;
+  pickupLat: string | null;       // numeric — postgres.js가 문자열로 준다
+  pickupLng: string | null;
   quantity: number;
   quantityUnit: string;
   isUsed: boolean;

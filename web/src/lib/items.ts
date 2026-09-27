@@ -6,12 +6,14 @@ const CARD = sql`
   i.*, o.name AS org_name, c.label AS category_label, c.risk_level,
   COALESCE((SELECT array_agg(p.url ORDER BY p.sort_order) FROM item_photos p WHERE p.item_id = i.id), '{}') AS photos`;
 
-/** 물품 기관(o) ↔ 보는 사람 기관(me) 직선거리 km, 소수 1자리. 둘 중 좌표가 없으면 NULL — 화면은 거리를 숨긴다.
+/** 물품 위치 ↔ 보는 사람 기관(me) 직선거리 km, 소수 1자리. 물품 위치 = 거래 희망 장소(i.pickup_*)가 있으면 그것, 없으면 등록 기관(o).
+ *  둘 중 좌표가 없으면 NULL — 화면은 거리를 숨긴다. 쓰는 쿼리는 items i, organizations o, organizations me 별칭이 있어야 한다.
  *  도로 거리가 아니다 (경로 API는 유료). 좌표는 db/orgs.sql, web/scripts/geocode-orgs.mjs. */
 export const DISTANCE_KM = sql`
   round((6371 * 2 * asin(sqrt(
-    power(sin(radians(me.lat - o.lat) / 2), 2)
-    + cos(radians(o.lat)) * cos(radians(me.lat)) * power(sin(radians(me.lng - o.lng) / 2), 2)
+    power(sin(radians(me.lat - COALESCE(i.pickup_lat, o.lat)) / 2), 2)
+    + cos(radians(COALESCE(i.pickup_lat, o.lat))) * cos(radians(me.lat))
+      * power(sin(radians(me.lng - COALESCE(i.pickup_lng, o.lng)) / 2), 2)
   )))::numeric, 1)::float`;
 
 /** MVP §4.2 스와이프 피드 — 안 본 것, 우리 기관 것 제외.
@@ -25,7 +27,7 @@ export function swipeFeed(userId: string, orgId: string | null, limit = 20) {
       EXISTS (SELECT 1 FROM bookmarks b WHERE b.user_id = ${userId} AND b.item_id = i.id) AS bookmarked,
       (SELECT count(*)::int FROM bookmarks b WHERE b.item_id = i.id) AS bookmark_count,
       (SELECT count(*)::int FROM transfers t WHERE t.item_id = i.id AND t.status <> 'cancelled') AS chat_count,
-      o.address AS org_address,
+      COALESCE(i.pickup_address, o.address) AS org_address,   -- 카드의 "구"는 물품 위치 기준
       ${DISTANCE_KM} AS distance_km
     FROM items i JOIN organizations o ON o.id = i.org_id JOIN categories c ON c.code = i.category
     LEFT JOIN organizations me ON me.id = ${orgId}::uuid

@@ -4,34 +4,66 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Category } from "@/lib/types";
 import { CONDITION_LABEL, CONDITIONS } from "@/lib/labels";
+import { KakaoMap } from "@/components/KakaoMap";
 
-/** 등록하기 — 기획 정의서 58-156·157(사진 선택) + Notion 03(게시물 내용 등록).
+/** 등록하기 — 기획 정의서 58-156·157(사진 선택) + 82-25·26(게시물 내용 등록), decisions/0010.
  *
- *  웹이라 사진보관함 권한 팝업·전체 목록(58-83·113·114)은 없다. 폰 사진 선택기로 가져온 사진을
- *  우리 그리드에 모으고, 누르는 순서대로 번호를 매긴다(1번 = 대표). 카메라도 폰 기본 카메라(capture).
- *  편집(자르기·회전·그리기)은 이번 범위 밖. 업로드는 선택한 사진만, "n장 사진 등록하기"를 누를 때. */
+ *  웹이라 사진보관함 권한 팝업·전체 목록은 없다. 폰 사진 선택기로 가져온 사진을 우리 그리드에 모으고,
+ *  누르는 순서대로 번호를 매긴다(1번 = 대표). 카메라도 폰 기본 카메라(capture). 편집은 범위 밖.
+ *  업로드는 선택한 사진만, "n장 사진 등록하기"를 누를 때 — 그래서 입력 화면에선 사진이 전부 URL을 갖는다. */
 const MAX = 10;
 
-type Pick = { id: string; file: File; preview: string; url?: string };
+type Pick = { id: string; file?: File; preview: string; url?: string };   // 임시저장에서 복원한 사진은 file 없이 url만
+type Org = { name: string; address: string | null; lat: number | null; lng: number | null };
+type Place = { name: string; address: string | null; lat: number | null; lng: number | null };
 
-export function NewItemForm({ categories, orgName }: { categories: Category[]; orgName: string }) {
+const EMPTY = {
+  category: "", name: "", description: "", history: "", quantity: 1,
+  isUsed: null as boolean | null, condition: "", onLedger: false, approvalConfirmed: false, fundingSource: "",
+};
+type Form = typeof EMPTY;
+type Draft = { photos: { id: string; url: string }[]; f: Form; place: Place; savedAt: string };
+
+/** 임시저장 — 이 기기 브라우저에만 (다른 기기에서 이어 쓰기는 안 된다). 사진은 이미 올린 URL만 담는다. */
+const draftKey = (userId: string) => `nanum:new-draft:${userId}`;
+function readDraft(userId: string): Draft | null {
+  try { const raw = localStorage.getItem(draftKey(userId)); return raw ? JSON.parse(raw) : null; } catch { return null; }
+}
+
+export function NewItemForm({ categories, org, userId }: { categories: Category[]; org: Org; userId: string }) {
   const router = useRouter();
   const [step, setStep] = useState<"photos" | "info">("photos");
   const [pool, setPool] = useState<Pick[]>([]);          // 가져온 사진, 최근 것이 앞
-  const [order, setOrder] = useState<string[]>([]);      // 선택 순서 (Pick.id)
+  const [order, setOrder] = useState<string[]>([]);      // 선택 순서 (Pick.id). 1번이 대표
   const [uploading, setUploading] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [f, setF] = useState<Form>(EMPTY);
+  const [place, setPlace] = useState<Place>({ name: org.name, address: org.address, lat: org.lat, lng: org.lng });
+  const [editPlace, setEditPlace] = useState(false);
+  const [addrInput, setAddrInput] = useState("");
   const previews = useRef<string[]>([]);
+  const dragId = useRef<string | null>(null);
 
   // 미리보기 URL은 떠날 때 한 번에 푼다
   useEffect(() => () => previews.current.forEach((u) => URL.revokeObjectURL(u)), []);
 
-  const [f, setF] = useState({
-    category: "", name: "", description: "", history: "", quantity: "", quantityUnit: "개",
-    isUsed: null as boolean | null, condition: "", onLedger: false, approvalConfirmed: false, fundingSource: "",
-  });
-  const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((s) => ({ ...s, [k]: v }));
+  // 임시저장 복원 — 저장해 둔 게 있으면 바로 입력 화면으로 (기획: "재진입 시 바로 복원")
+  useEffect(() => {
+    void Promise.resolve().then(() => {
+      const d = readDraft(userId);
+      if (!d?.photos.length) return;
+      setPool(d.photos.map((p) => ({ id: p.id, url: p.url, preview: p.url })));
+      setOrder(d.photos.map((p) => p.id));
+      setF({ ...EMPTY, ...d.f });
+      setPlace(d.place);
+      setStep("info");
+      setNote("임시저장한 글을 불러왔어요.");
+    });
+  }, [userId]);
+
+  const set = <K extends keyof Form>(k: K, v: Form[K]) => setF((s) => ({ ...s, [k]: v }));
   const cat = categories.find((c) => c.code === f.category);
   const red = cat?.riskLevel === "red";
   const picked = order.map((id) => pool.find((p) => p.id === id)!).filter(Boolean);
@@ -57,11 +89,11 @@ export function NewItemForm({ categories, orgName }: { categories: Category[]; o
     });
   }
 
-  /** 선택한 사진만 올린다. 이미 올린 건(url 있음) 건너뛴다 — 정보 화면에서 돌아왔다 다시 와도 두 번 안 올린다. */
+  /** 선택한 사진만 올린다. 이미 올린 건(url 있음) 건너뛴다 — 입력 화면에서 돌아왔다 다시 와도 두 번 안 올린다. */
   async function upload() {
     setErr(null);
     for (const [i, p] of picked.entries()) {
-      if (p.url) continue;
+      if (p.url || !p.file) continue;
       setUploading(`${i + 1}/${picked.length}`);
       const fd = new FormData(); fd.append("file", p.file);
       const r = await fetch("/api/uploads", { method: "POST", body: fd });
@@ -73,23 +105,53 @@ export function NewItemForm({ categories, orgName }: { categories: Category[]; o
     setStep("info");
   }
 
+  /** 사진 줄 끌어서 순서 바꾸기 — 손가락(포인터)이 지나가는 사진 자리로 옮긴다. HTML5 드래그는 폰에서 안 돼서 포인터로. */
+  function onDragMove(e: React.PointerEvent) {
+    const from = dragId.current;
+    if (!from) return;
+    const over = (document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)?.closest<HTMLElement>("[data-photo]")?.dataset.photo;
+    if (!over || over === from) return;
+    setOrder((o) => {
+      const next = o.filter((x) => x !== from);
+      next.splice(o.indexOf(over), 0, from);
+      return next;
+    });
+  }
+
+  async function findPlace() {
+    setErr(null);
+    const r = await fetch("/api/geocode", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ address: addrInput }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { setErr(j.error ?? "주소를 찾지 못했어요."); return; }
+    setPlace((p) => ({ ...p, address: j.address, lat: j.lat, lng: j.lng }));
+    setEditPlace(false);
+  }
+
+  function saveDraft() {
+    const d: Draft = { photos: picked.map((p) => ({ id: p.id, url: p.url! })), f, place, savedAt: new Date().toISOString() };
+    try { localStorage.setItem(draftKey(userId), JSON.stringify(d)); setNote("임시저장했어요. 다음에 등록하기를 누르면 이어서 쓸 수 있어요."); }
+    catch { setErr("임시저장하지 못했어요."); }
+  }
+
   async function submit() {
     setBusy(true); setErr(null);
+    const custom = place.lat !== org.lat || place.lng !== org.lng || place.name !== org.name;   // 기관 위치 그대로면 비워 둔다
     const r = await fetch("/api/items", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        ...f, photos: picked.map((p) => p.url), quantity: Number(f.quantity),
+        ...f, photos: picked.map((p) => p.url), quantityUnit: "개",
         isUsed: f.isUsed === true, fundingSource: f.fundingSource || null,
+        ...(custom ? { pickupPlace: place.name, pickupAddress: place.address, pickupLat: place.lat, pickupLng: place.lng } : {}),
       }),
     });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) { setErr(j.error ?? "등록하지 못했어요."); setBusy(false); return; }
+    try { localStorage.removeItem(draftKey(userId)); } catch { /* 저장소를 못 써도 등록은 끝났다 */ }
     router.replace(`/new/done?id=${j.id}`);
   }
 
   const canSubmit = picked.length > 0 && picked.every((p) => p.url) && f.category && f.name.trim()
-    && Number.isInteger(Number(f.quantity)) && Number(f.quantity) >= 1
-    && f.isUsed !== null && f.condition && (!red || f.approvalConfirmed);
+    && f.quantity >= 1 && f.isUsed !== null && f.condition && (!red || f.approvalConfirmed);
 
   // ── 1. 사진 선택 ────────────────────────────────────────────────────────
   if (step === "photos") {
@@ -151,40 +213,48 @@ export function NewItemForm({ categories, orgName }: { categories: Category[]; o
     );
   }
 
-  // ── 2. 게시물 내용 등록 ──────────────────────────────────────────────────
+  // ── 2. 게시물 내용 등록 (기획 정의서 82-25·26) ──────────────────────────
   const label = "mb-2 block text-sm font-bold";
   const pill = (on: boolean) => `h-11 rounded-full border px-4 text-sm font-medium transition ${
     on ? "border-brand bg-brand/10 text-brand" : "border-neutral-200 text-neutral-700"}`;
 
   return (
     <main className="fixed inset-0 z-30 mx-auto flex max-w-md flex-col bg-white">
-      <header className="relative flex h-14 shrink-0 items-center px-2">
+      <header className="relative flex h-14 shrink-0 items-center justify-between px-2">
         <button type="button" onClick={() => setStep("photos")} aria-label="사진 선택으로" className="size-10 grid place-items-center text-2xl">✕</button>
-        <h1 className="absolute inset-x-16 truncate text-center text-base font-bold pointer-events-none">{orgName}</h1>
+        <h1 className="absolute inset-x-20 truncate text-center text-base font-bold pointer-events-none">{org.name}</h1>
+        <button type="button" onClick={saveDraft} className="px-3 text-sm text-neutral-400">임시저장</button>
       </header>
 
       <div className="flex-1 overflow-y-auto px-5 pb-6">
-        {/* 사진 — 1번이 대표. 카메라 칸은 사진 선택으로 돌아간다 */}
-        <div className="-mx-5 flex gap-2 overflow-x-auto px-5 py-2">
+        {note && <p role="status" className="mb-2 rounded-xl bg-brand/10 px-3 py-2 text-xs text-brand">{note}</p>}
+
+        {/* 사진 — 1번이 대표. 끌어서 순서 바꾸기, ✕로 빼기. 카메라 칸은 사진 선택으로 돌아간다 */}
+        <div className="flex flex-wrap gap-2 pt-1">
           <button type="button" onClick={() => setStep("photos")} aria-label="사진 다시 고르기"
-            className="size-20 shrink-0 rounded-xl border border-neutral-200 grid place-items-center text-neutral-500">
-            <span className="flex flex-col items-center text-[11px]">
+            className="size-[4.75rem] rounded-2xl border border-neutral-200 grid place-items-center text-neutral-500">
+            <span className="flex flex-col items-center text-xs">
               <svg aria-hidden viewBox="0 0 24 24" className="size-6" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></svg>
-              {picked.length}/{MAX}
+              <span><span className="font-semibold text-brand">{picked.length}</span>/{MAX}</span>
             </span>
           </button>
           {picked.map((p, i) => (
-            <div key={p.id} className="relative size-20 shrink-0 overflow-hidden rounded-xl">
+            <div key={p.id} data-photo={p.id}
+              onPointerDown={(e) => { if ((e.target as HTMLElement).closest("button")) return; dragId.current = p.id; e.currentTarget.setPointerCapture(e.pointerId); }}
+              onPointerMove={onDragMove}
+              onPointerUp={() => { dragId.current = null; }} onPointerCancel={() => { dragId.current = null; }}
+              className={`relative size-[4.75rem] touch-none select-none rounded-2xl cursor-grab ${i === 0 ? "ring-2 ring-brand" : ""}`}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={p.preview} alt="" className="size-full object-cover" />
-              {i === 0 && <span className="absolute inset-x-0 bottom-0 bg-black/55 py-0.5 text-center text-[10px] font-semibold text-white">대표</span>}
+              <img src={p.preview} alt="" draggable={false} className="size-full rounded-2xl object-cover pointer-events-none" />
+              {i === 0 && <span className="absolute inset-x-0 bottom-0 rounded-b-2xl bg-black/60 py-0.5 text-center text-[10px] font-semibold text-white">대표 사진</span>}
               <button type="button" onClick={() => toggle(p.id)} aria-label="이 사진 빼기"
-                className="absolute right-1 top-1 size-5 rounded-full bg-black/60 text-[11px] text-white grid place-items-center">✕</button>
+                className="absolute -right-1.5 -top-1.5 size-5 rounded-full bg-neutral-900 text-[11px] text-white grid place-items-center">✕</button>
             </div>
           ))}
         </div>
+        <p className="mt-2 text-xs text-neutral-400">드래그해서 순서를 바꿀 수 있어요. 첫 번째 사진이 대표 사진이 돼요.</p>
 
-        <label htmlFor="name" className={`${label} mt-5`}>물품명</label>
+        <label htmlFor="name" className={`${label} mt-6`}>물품명</label>
         <input id="name" className="field" value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="예: 네임펜 세트" />
 
         <p className={`${label} mt-6`}>물품 종류</p>
@@ -200,16 +270,15 @@ export function NewItemForm({ categories, orgName }: { categories: Category[]; o
           <p className={`mt-2 rounded-xl p-3 text-xs ${red ? "bg-red-50 text-red-800" : "bg-amber-50 text-amber-800"}`}>{cat.notice}</p>
         )}
 
-        <div className="mt-6 grid grid-cols-[1fr_7rem] gap-3">
-          <div>
-            <label htmlFor="qty" className={label}>수량</label>
-            <input id="qty" className="field" inputMode="numeric" value={f.quantity} placeholder="숫자만"
-              onChange={(e) => set("quantity", e.target.value.replace(/\D/g, ""))} />
-          </div>
-          <div>
-            <label htmlFor="unit" className={label}>단위</label>
-            <input id="unit" className="field" value={f.quantityUnit} onChange={(e) => set("quantityUnit", e.target.value)} placeholder="개, 묶음" />
-          </div>
+        <p className={`${label} mt-6`}>수량</p>
+        <div className="flex h-12 w-36 items-center justify-between rounded-2xl border border-neutral-200 px-2">
+          <button type="button" onClick={() => set("quantity", Math.max(1, f.quantity - 1))} disabled={f.quantity <= 1}
+            aria-label="하나 줄이기" className="size-9 grid place-items-center text-xl text-neutral-700 disabled:text-neutral-300">−</button>
+          <input aria-label="수량" inputMode="numeric" value={f.quantity}
+            onChange={(e) => set("quantity", Math.max(1, Number(e.target.value.replace(/\D/g, "")) || 1))}
+            className="w-10 bg-transparent text-center text-base font-bold outline-none" />
+          <button type="button" onClick={() => set("quantity", f.quantity + 1)}
+            aria-label="하나 늘리기" className="size-9 grid place-items-center text-xl text-neutral-700">+</button>
         </div>
 
         <p className={`${label} mt-6`}>사용 여부</p>
@@ -230,13 +299,46 @@ export function NewItemForm({ categories, orgName }: { categories: Category[]; o
 
         <label htmlFor="desc" className={`${label} mt-6`}>자세한 설명</label>
         <textarea id="desc" className="field h-32 py-3 leading-relaxed" value={f.description} onChange={(e) => set("description", e.target.value)}
-          placeholder="물품 특징, 희망하는 거래 방식, 같이 드릴 덤 물품 등을 적어 주세요." />
+          placeholder={"물품에 대한 TMI를 알려주세요.\n희망하는 거래 방식(방문 수령·전달 방법 등)이나 같이 드리는 덤 물품도 여기에 적어주세요."} />
+
+        {/* 거래 희망 장소 — 기본은 우리 기관. 바꾸면 상세 지도·거리·카드의 "구"가 이 장소 기준이 된다 */}
+        <p className={`${label} mt-6`}>거래 희망 장소</p>
+        <div className="overflow-hidden rounded-2xl border border-neutral-200">
+          {place.lat != null && place.lng != null ? (
+            <KakaoMap key={`${place.lat},${place.lng}`} item={{ lat: place.lat, lng: place.lng }} mine={null}
+              itemName={place.name} distanceKm={null} link={false} className="h-36" />
+          ) : (
+            <p className="grid h-36 place-items-center bg-neutral-100/70 text-sm text-neutral-400">위치를 정해 주세요</p>
+          )}
+          <div className="flex items-center gap-2 px-4 py-3">
+            <svg aria-hidden viewBox="0 0 24 24" className="size-5 shrink-0 text-brand" fill="none" stroke="currentColor" strokeWidth={2}><path d="M12 21s7-6.2 7-11.5a7 7 0 0 0-14 0C5 14.8 12 21 12 21z" /><circle cx="12" cy="9.5" r="2.5" /></svg>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-bold">{place.name}</span>
+              {place.address && <span className="block truncate text-xs text-neutral-400">{place.address}</span>}
+            </span>
+            <button type="button" onClick={() => { setEditPlace((v) => !v); setAddrInput(place.address ?? ""); }}
+              className="shrink-0 text-sm font-semibold text-brand">위치 변경</button>
+          </div>
+          {editPlace && (
+            <div className="space-y-2 border-t border-neutral-200 px-4 py-3">
+              <input className="field" value={place.name} onChange={(e) => setPlace((p) => ({ ...p, name: e.target.value }))}
+                placeholder="장소 이름 (예: 용산 청년지음 1층 나눔곳간)" aria-label="장소 이름" />
+              <div className="flex gap-2">
+                <input className="field" value={addrInput} onChange={(e) => setAddrInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void findPlace(); } }}
+                  placeholder="도로명 주소" aria-label="도로명 주소" />
+                <button type="button" onClick={findPlace} disabled={addrInput.trim().length < 5}
+                  className="btn h-13 shrink-0 rounded-2xl bg-brand/10 px-4 text-sm text-brand">찾기</button>
+              </div>
+            </div>
+          )}
+        </div>
 
         <label htmlFor="hist" className={`${label} mt-6`}>물품 히스토리 <span className="font-normal text-neutral-400">(선택)</span></label>
         <input id="hist" className="field" value={f.history} maxLength={200} onChange={(e) => set("history", e.target.value)}
-          placeholder="어떤 히스토리가 있는지 간단하게 작성해 주세요." />
+          placeholder="어떤 히스토리가 있는지 간단하게 작성해주세요." />
 
-        {/* 법적 필드 — 법적 검토 §5. 사람이 입력한다(AGENTS 불변 4). 🔴면 펼쳐서 강제 */}
+        {/* 법적 필드 — Figma엔 없지만 법적 검토 §5. 사람이 입력한다(AGENTS 불변 4). 🔴면 펼쳐서 강제 */}
         <details open={red} className="mt-6 rounded-2xl bg-neutral-100/70 p-4">
           <summary className="cursor-pointer text-sm font-bold">관리 정보 {red ? "(필수)" : "(선택)"}</summary>
           <div className="mt-3 space-y-3 text-sm">
@@ -261,7 +363,7 @@ export function NewItemForm({ categories, orgName }: { categories: Category[]; o
       </div>
 
       <div className="shrink-0 px-5 pt-3 pb-[calc(16px+env(safe-area-inset-bottom))]">
-        <button onClick={submit} disabled={!canSubmit || busy} className="btn-cta">작성 완료</button>
+        <button onClick={submit} disabled={!canSubmit || busy} className="btn-cta">작성완료</button>
       </div>
     </main>
   );

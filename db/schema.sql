@@ -74,6 +74,11 @@ CREATE TABLE items (
   name          text NOT NULL,
   description   text,
   history       text,           -- 물품 히스토리(선택, 단답). 등록하기 기획(Notion 03) — "어떤 히스토리가 있는지"
+  -- 거래 희망 장소 (기획 정의서 82-26). 비어 있으면 등록 기관 위치를 쓴다. 지도·거리·"구"가 이걸 먼저 본다
+  pickup_place   text,           -- 사람이 부르는 이름 (예: 용산 청년지음 1층 나눔곳간)
+  pickup_address text,           -- 카카오가 정리한 도로명 주소
+  pickup_lat     numeric(9,6),
+  pickup_lng     numeric(9,6),
   quantity      integer NOT NULL CHECK (quantity > 0),
   quantity_unit text NOT NULL DEFAULT '개',
   is_used       boolean NOT NULL,

@@ -33,6 +33,13 @@ export const POST = api(async (req) => {
   const history = String(b.history ?? "").trim() || null;   // 선택. 단답형
   if (history && history.length > 200) throw new HttpError(400, "물품 히스토리는 200자 이하로 적어 주세요.");
 
+  // 거래 희망 장소 (선택). 좌표는 /api/geocode가 준 값 — 한국 범위 밖이면 받지 않는다. 비우면 기관 위치를 쓴다.
+  const pickupPlace = String(b.pickupPlace ?? "").trim().slice(0, 100) || null;
+  const pickupAddress = String(b.pickupAddress ?? "").trim().slice(0, 200) || null;
+  const [pLat, pLng] = [Number(b.pickupLat), Number(b.pickupLng)];
+  const hasCoord = b.pickupLat != null && b.pickupLng != null;
+  if (hasCoord && !(pLat > 33 && pLat < 39 && pLng > 124 && pLng < 132)) throw new HttpError(400, "거래 희망 장소 좌표가 올바르지 않아요.");
+
   const [cat] = await sql`SELECT code, risk_level FROM categories WHERE code = ${String(b.category)}`;
   if (!cat) throw new HttpError(400, "카테고리를 골라 주세요.");
   if (cat.riskLevel === "red" && !b.approvalConfirmed) {
@@ -41,9 +48,11 @@ export const POST = api(async (req) => {
 
   const id = await sql.begin(async (tx) => {
     const [item] = await tx`
-      INSERT INTO items (org_id, created_by, category, name, description, history, quantity, quantity_unit,
+      INSERT INTO items (org_id, created_by, category, name, description, history,
+                         pickup_place, pickup_address, pickup_lat, pickup_lng, quantity, quantity_unit,
                          is_used, condition, on_ledger, approval_confirmed, funding_source)
       VALUES (${u.orgId}, ${u.id}, ${cat.code}, ${name}, ${String(b.description ?? "").trim() || null}, ${history},
+              ${pickupPlace}, ${pickupAddress}, ${hasCoord ? pLat : null}, ${hasCoord ? pLng : null},
               ${quantity}, ${String(b.quantityUnit ?? "개").trim() || "개"},
               ${!!b.isUsed}, ${b.condition}, ${!!b.onLedger}, ${!!b.approvalConfirmed}, ${b.fundingSource ?? null})
       RETURNING id`;

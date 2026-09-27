@@ -167,9 +167,23 @@ OFF_ID=$(api "$A" POST /api/items "$NEW_OFF" | body | jget id)
 expect "물품 히스토리 저장" "작년 청년주간 행사 때 쓴 액자" "$(api "$B" GET "/api/items/$INT_ID" | body | jget history)"
 LONG_HIST="{\"category\":\"interior\",\"name\":\"긴 히스토리\",\"history\":\"$(printf '가%.0s' $(seq 201))\",\"quantity\":1,\"condition\":\"중\",\"isUsed\":true,\"photos\":[\"$URL\"]}"
 expect "히스토리 200자 초과 400" "400" "$(api "$A" POST /api/items "$LONG_HIST" | status)"
+
 expect "관심(interior)이 1번" "$INT_ID" "$(api "$B" GET /api/items | body | first)"
 # A는 관심을 stationery 포함으로 골랐지만 둘 다 자기 기관 것이라 안 보인다 — 정렬이 소속 규칙을 뚫지 않는다.
 expect "A 피드엔 자기 것 없음" "False" "$(api "$A" GET /api/items | body | has $OFF_ID)"
+
+echo "5b-2. 거래 희망 장소 — 주소 찾기, 저장, 거리 기준 (기획 정의서 82-26)"
+GEO_OK='{"address":"서울특별시 강동구 올림픽로 610"}'; GEO_BAD='{"address":"없는나라 없는길 99999"}'
+expect "주소 찾기 200"      "200" "$(api "$A" POST /api/geocode "$GEO_OK" | status)"
+expect "못 찾는 주소 400"   "400" "$(api "$A" POST /api/geocode "$GEO_BAD" | status)"
+GLAT=$(api "$A" POST /api/geocode "$GEO_OK" | body | jget lat); GLNG=$(api "$A" POST /api/geocode "$GEO_OK" | body | jget lng)
+PICK="{\"category\":\"packaging\",\"name\":\"장소 지정 박스\",\"quantity\":1,\"condition\":\"중\",\"isUsed\":true,\"photos\":[\"$URL\"],\"pickupPlace\":\"강동 창고\",\"pickupAddress\":\"서울 강동구 올림픽로 610\",\"pickupLat\":$GLAT,\"pickupLng\":$GLNG}"
+PICK_ID=$(api "$A" POST /api/items "$PICK" | body | jget id)
+expect "거래 장소 저장" "강동 창고" "$(api "$B" GET "/api/items/$PICK_ID" | body | jget pickupPlace)"
+# A 기관(세종대로)·B 기관(사직로)은 1~2km. 거래 장소가 강동이면 10km를 넘어야 한다 — 거리가 장소 기준이라는 뜻
+expect "거리는 거래 장소 기준" "True" "$(api "$B" GET /api/items | body | dist $PICK_ID | python3 -c 'import sys; v=sys.stdin.read().strip(); print(v not in ("None","missing") and float(v) > 10)')"
+BADPICK="{\"category\":\"packaging\",\"name\":\"좌표 틀림\",\"quantity\":1,\"condition\":\"중\",\"isUsed\":true,\"photos\":[\"$URL\"],\"pickupLat\":0,\"pickupLng\":0}"
+expect "한국 밖 좌표 400" "400" "$(api "$A" POST /api/items "$BADPICK" | status)"
 
 echo "5c. 북마크 — 하트 켜기/끄기, 프로필 > 북마크"
 expect "처음엔 꺼짐"        "False" "$(api "$B" GET /api/items | body | marked $INT_ID)"

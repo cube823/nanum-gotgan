@@ -54,7 +54,7 @@ export const POST = api(async (req, { params }) => {
 
 ```bash
 pnpm typecheck && pnpm lint && pnpm build
-pnpm dev &  pnpm smoke      # 100건
+pnpm dev &  pnpm smoke      # 105건
 ```
 
 smoke는 끝날 때 자기 실행 번호의 계정·기관·물품을 지운다(`db/cleanup-test-data.sql`, 로컬 DB일 때만). 남겨서 보려면 `SMOKE_KEEP=1 pnpm smoke`. 예전에 쌓인 smoke 데이터는 `psql -d nanum_gotgan -v re='^[a-f][0-9]+@dev\.local$' -f db/cleanup-test-data.sql`.

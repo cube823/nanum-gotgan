@@ -23,12 +23,15 @@ export async function ItemDetail({ id, sheet = false }: { id: string; sheet?: bo
   if (!item || item.status === "withdrawn") notFound();
 
   const [meta] = await sql`
-    SELECT COALESCE(owner.real_name, owner.nickname) AS owner_name, o.address AS org_address,
+    SELECT COALESCE(owner.real_name, owner.nickname) AS owner_name,
+      COALESCE(i.pickup_place, o.name) AS place_name, COALESCE(i.pickup_address, o.address) AS org_address,
       me.name AS my_org_name, me.address AS my_org_address, ${DISTANCE_KM} AS distance_km,
-      o.lat::float AS lat, o.lng::float AS lng, me.lat::float AS my_lat, me.lng::float AS my_lng,
+      COALESCE(i.pickup_lat, o.lat)::float AS lat, COALESCE(i.pickup_lng, o.lng)::float AS lng,   -- 거래 희망 장소 우선
+      me.lat::float AS my_lat, me.lng::float AS my_lng,
       (SELECT count(*)::int FROM bookmarks b WHERE b.item_id = ${item.id}) AS bookmark_count,
       (SELECT count(*)::int FROM transfers t WHERE t.item_id = ${item.id} AND t.status <> 'cancelled') AS chat_count
     FROM users owner
+    JOIN items i ON i.id = ${item.id}
     JOIN organizations o ON o.id = ${item.orgId}
     LEFT JOIN organizations me ON me.id = ${u.orgId}
     WHERE owner.id = ${item.createdBy}`;
@@ -116,7 +119,7 @@ export async function ItemDetail({ id, sheet = false }: { id: string; sheet?: bo
             비워 두면 "지도가 사라졌다"와 구분이 안 된다. 주소 필수(0009) 전에 만든 기관,
             또는 가입 때 카카오가 응답하지 않아 주소만 있고 좌표가 없는 기관 — 그래서 "주소 없음"이라 쓰지 않는다 */}
         {meta.lat != null ? (
-          <KakaoMap item={{ lat: meta.lat, lng: meta.lng }} itemName={item.orgName}
+          <KakaoMap item={{ lat: meta.lat, lng: meta.lng }} itemName={meta.placeName}
             mine={meta.myLat != null && !sameOrg ? { lat: meta.myLat, lng: meta.myLng } : null}
             distanceKm={sameOrg ? null : meta.distanceKm} />
         ) : (
@@ -128,7 +131,7 @@ export async function ItemDetail({ id, sheet = false }: { id: string; sheet?: bo
           <li className="flex gap-2">
             <span aria-hidden className="mt-1.5 size-2 shrink-0 rounded-full bg-brand" />
             <span className="shrink-0 text-neutral-400">물품 위치</span>
-            <span className="font-semibold">{item.orgName}{meta.orgAddress && ` · ${meta.orgAddress}`}</span>
+            <span className="font-semibold">{meta.placeName}{meta.orgAddress && ` · ${meta.orgAddress}`}</span>
           </li>
           {meta.myOrgName && !sameOrg && (
             <li className="flex gap-2">

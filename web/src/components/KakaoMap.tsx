@@ -33,8 +33,10 @@ const pin = (color: string) =>
 /** 기획 정의서 11 위치 지도. 물품 기관(초록) ↔ 우리 기관(빨강), 점선, 가운데 "약 n km".
  *  보기 전용 — 끌기·확대를 막아 시트 스크롤을 뺏지 않는다. 누르면 카카오맵 길찾기.
  *  SDK를 못 불러오면(키 없음·도메인 미등록·네트워크) 지도 없이 거리 글자만 남긴다. */
-export function KakaoMap({ item, mine, itemName, distanceKm }: {
+export function KakaoMap({ item, mine, itemName, distanceKm, link = true, className = "mt-3 h-[132px]" }: {
   item: Pt; mine: Pt | null; itemName: string; distanceKm: number | null;
+  link?: boolean;        // false = 보기만 (등록하기 거래 희망 장소 미리보기)
+  className?: string;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const [failed, setFailed] = useState(!KEY);
@@ -70,11 +72,13 @@ export function KakaoMap({ item, mine, itemName, distanceKm }: {
   if (failed) {
     return distanceKm != null ? <p className="mt-3 text-sm font-semibold text-brand">약 {distanceKm}km</p> : null;
   }
+  const canvas = <div ref={box} className="size-full pointer-events-none" />;
+  if (!link) return <div className={`${className} overflow-hidden bg-brand/5`}>{canvas}</div>;
   return (
     <a href={`https://map.kakao.com/link/to/${encodeURIComponent(itemName)},${item.lat},${item.lng}`}
       target="_blank" rel="noreferrer" aria-label={`${itemName} 길찾기 (카카오맵)`}
-      className="mt-3 block h-[132px] overflow-hidden rounded-2xl bg-brand/5">
-      <div ref={box} className="size-full pointer-events-none" />
+      className={`${className} block overflow-hidden rounded-2xl bg-brand/5`}>
+      {canvas}
     </a>
   );
 }

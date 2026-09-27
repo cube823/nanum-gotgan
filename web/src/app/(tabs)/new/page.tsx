@@ -18,7 +18,10 @@ export default async function NewItemPage() {
   }
   const [cats, [org]] = await Promise.all([
     sql<Category[]>`SELECT code, label, risk_level, notice FROM categories ORDER BY sort_order`,
-    sql`SELECT name FROM organizations WHERE id = ${u.orgId}`,
+    sql`SELECT name, address, lat::float AS lat, lng::float AS lng FROM organizations WHERE id = ${u.orgId}`,
   ]);
-  return <NewItemForm categories={cats} orgName={org?.name ?? ""} />;
+  return (
+    <NewItemForm categories={cats} userId={u.id}
+      org={{ name: org?.name ?? "", address: org?.address ?? null, lat: org?.lat ?? null, lng: org?.lng ?? null }} />
+  );
 }

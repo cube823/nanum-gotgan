@@ -105,11 +105,17 @@ export async function ItemDetail({ id, sheet = false }: { id: string; sheet?: bo
         {RISK_NOTE[item.riskLevel] && <p className="mt-4 text-xs text-neutral-500 rounded-xl bg-amber-50 p-3">{RISK_NOTE[item.riskLevel]}</p>}
 
         <h2 className="mt-8 font-bold">위치</h2>
-        {/* 좌표가 있으면 지도(거리는 지도 위 알약), 없으면 지도 없이 주소만 */}
-        {meta.lat != null && (
+        {/* 좌표가 있으면 지도(거리는 지도 위 알약). 없으면 조용히 비우지 말고 왜 없는지 말한다 —
+            비워 두면 "지도가 사라졌다"와 구분이 안 된다. 주소 필수(0009) 전에 만든 기관,
+            또는 가입 때 카카오가 응답하지 않아 주소만 있고 좌표가 없는 기관 — 그래서 "주소 없음"이라 쓰지 않는다 */}
+        {meta.lat != null ? (
           <KakaoMap item={{ lat: meta.lat, lng: meta.lng }} itemName={item.orgName}
             mine={meta.myLat != null && !sameOrg ? { lat: meta.myLat, lng: meta.myLng } : null}
             distanceKm={sameOrg ? null : meta.distanceKm} />
+        ) : (
+          <p className="mt-3 grid h-[132px] place-items-center rounded-2xl bg-neutral-100/70 px-6 text-center text-sm text-neutral-400">
+            이 기관은 위치 정보가 없어<br />지도를 보여줄 수 없어요
+          </p>
         )}
         <ul className="mt-3 mb-4 space-y-2 text-sm">
           <li className="flex gap-2">

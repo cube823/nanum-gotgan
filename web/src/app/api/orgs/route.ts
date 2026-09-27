@@ -7,10 +7,15 @@ const ORG_TYPES = new Set(["위탁", "직영", "모름"]);
 
 /**
  * 소속 정하기. DB-SCHEMA §1.5.
- *  { orgId }                      → 기존 기관에 member로 합류 (pending)
- *  { name, orgType, bizNo }       → 새 기관 생성 + 만든 사람이 manager (pending)
+ *  { orgId }                      → 기존 기관에 member로 합류
+ *  { name, orgType, bizNo }       → 새 기관 생성 + 만든 사람이 manager
+ *
+ * 둘 다 바로 verified다 — 기획 정의서(Figma)에 승인 단계가 없다. 가입 4단계가 끝나면
+ * 곧장 자원보기로 간다 (`decisions/0008`). 기관 목록은 서울시 청년센터 명단으로
+ * 시딩돼 있어(`db/orgs.sql`) 대부분 자동완성에서 고르게 된다.
+ *
  * bizNo는 국세청 상태조회로 실재·휴폐업만 본다. 상호는 그 API가 검증하지 않으므로
- * "그 기관 소속"은 여전히 승인이 정한다 (lib/bizno.ts).
+ * "그 기관 소속"은 아무도 확인하지 않는다 (lib/bizno.ts). 승인을 없앤 대가다.
  * 이미 verified면 못 바꾼다 — 소속 변경은 MVP 밖.
  */
 export const POST = api(async (req) => {
@@ -22,7 +27,7 @@ export const POST = api(async (req) => {
   if (body.orgId) {
     const [org] = await sql`SELECT id FROM organizations WHERE id = ${body.orgId}`;
     if (!org) throw new HttpError(404, "기관을 찾을 수 없어요.");
-    await sql`UPDATE users SET org_id = ${org.id}, org_role = 'member', org_status = 'pending' WHERE id = ${u.id}`;
+    await sql`UPDATE users SET org_id = ${org.id}, org_role = 'member', org_status = 'verified' WHERE id = ${u.id}`;
     return Response.json({ orgId: org.id, role: "member" });
   }
 
@@ -43,6 +48,6 @@ export const POST = api(async (req) => {
   const [org] = await sql`
     INSERT INTO organizations (name, name_norm, org_type, biz_no, created_by)
     VALUES (${name}, ${norm}, ${orgType}, ${normalizeBizNo(bizRaw)}, ${u.id}) RETURNING id`;
-  await sql`UPDATE users SET org_id = ${org.id}, org_role = 'manager', org_status = 'pending' WHERE id = ${u.id}`;
+  await sql`UPDATE users SET org_id = ${org.id}, org_role = 'manager', org_status = 'verified' WHERE id = ${u.id}`;
   return Response.json({ orgId: org.id, role: "manager", bizChecked: biz.checked });
 });

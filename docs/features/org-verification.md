@@ -12,12 +12,12 @@
        STEP 2 기관정보: 자동완성 검색 → 합류(member) 또는 신규 생성(manager) + 사업자등록번호
        STEP 3 관심 자원: 🔴 뺀 9개 중 4개 이상
        STEP 4 가입 완료: "○○○님이 필요한 자원을 찾고 있어요" → 시작하기
-  → org_status = pending → /pending (5초 폴링)
-  → 운영자(첫 담당자) 또는 같은 기관 verified manager가 승인 → verified
-  → session.update() → /swipe
+  → org_status = verified (바로) → /swipe
 ```
 
-pending은 조회는 된다 — 가둬두지 않는다. 등록·신청만 403.
+**승인 단계는 없다** (`decisions/0008`). 기획 정의서에 없고, 기관 목록이 서울시 청년센터
+명단으로 시딩돼 있어(`db/orgs.sql`, 37곳) 대부분 자동완성에서 고른다.
+`/pending`과 `/admin/approvals`는 반려용으로 남겨 뒀다 — 되돌릴 때 코드를 다시 쓰지 않아도 된다.
 
 ## 파일
 

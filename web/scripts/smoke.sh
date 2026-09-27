@@ -51,7 +51,7 @@ expect "정상 200"      "200" "$(api "$A" PUT /api/me/profile '{"realName":"기
 expect "하이픈 정규화" "01012345678" "$(api "$A" GET /api/me | body | jget phone)"
 api "$B" PUT /api/me/profile '{"realName":"기관B 담당","phone":"01098765432"}' >/dev/null
 
-echo "2. 소속 — 새 기관 생성 (manager) + pending"
+echo "2. 소속 — 기관 생성/합류 (바로 verified, decisions/0008)"
 # 사업자등록번호는 국세청 체크디지트를 통과해야 한다 (lib/bizno.ts).
 # 아래 번호는 체크디지트만 맞춘 테스트값이다 — 실존 사업자와 무관하다.
 # JSON은 변수에 담아 넘긴다 — $( ) 안에 인라인으로 쓰면 \" 가 한 번 더 해석돼 body가 깨진다.
@@ -65,18 +65,26 @@ expect "체크디지트 400" "400" "$(api "$A" POST /api/orgs "$BAD_BIZ" | statu
 expect "0반복 400"      "400" "$(api "$A" POST /api/orgs "$ZERO_BIZ" | status)"
 api "$A" POST /api/orgs "$ORG_A" >/dev/null
 api "$B" POST /api/orgs "$ORG_B" >/dev/null
-expect "A pending"  "pending" "$(api "$A" GET /api/me | body | jget orgStatus)"
+expect "A 바로 verified" "verified" "$(api "$A" GET /api/me | body | jget orgStatus)"
 expect "A manager"  "manager" "$(api "$A" GET /api/me | body | jget orgRole)"
+expect "소속 확정 후 재지정 400" "400" "$(api "$A" POST /api/orgs "$ORG_B" | status)"
+# 중복 검사는 아직 소속이 없는 계정이라야 거기까지 간다 (위는 "이미 확정" 에서 먼저 걸린다)
+D=$J/d; login "$D" "d$SUF@dev.local" "중복 시도자"
 DUP="{\"name\":\"테스트청년센터A$SUF\",\"orgType\":\"직영\",\"bizNo\":\"309-81-00342\"}"
-expect "중복 기관명 409" "409" "$(api "$B" POST /api/orgs "$DUP" | status)"
-expect "pending은 등록 403" "403" "$(api "$A" POST /api/items '{}' | status)"
+expect "중복 기관명 409" "409" "$(api "$D" POST /api/orgs "$DUP" | status)"
+# 기존 기관 합류 경로도 바로 verified여야 한다 — 신규 생성만 보면 이 분기를 놓친다
+AORG=$(api "$A" GET /api/me | body | python3 -c "import sys,json; print(json.load(sys.stdin)['org']['id'])")
+JOIN="{\"orgId\":\"$AORG\"}"
+expect "기존 기관 합류 200"   "200"      "$(api "$D" POST /api/orgs "$JOIN" | status)"
+expect "합류도 바로 verified" "verified" "$(api "$D" GET /api/me | body | jget orgStatus)"
+expect "합류는 member"        "member"   "$(api "$D" GET /api/me | body | jget orgRole)"
 
 echo "2b. 관심 자원 — 기획 정의서 STEP 3 (4개 이상, 🔴 제외)"
 FOUR='{"categories":["stationery","packaging","craft","disposable"]}'
 expect "3개는 400"        "400" "$(api "$A" PUT /api/me/interests '{"categories":["stationery","packaging","craft"]}' | status)"
 expect "🔴 섞이면 400"    "400" "$(api "$A" PUT /api/me/interests '{"categories":["stationery","packaging","craft","electronics"]}' | status)"
 expect "없는 코드 400"    "400" "$(api "$A" PUT /api/me/interests '{"categories":["stationery","packaging","craft","nope"]}' | status)"
-expect "pending도 저장됨" "200" "$(api "$A" PUT /api/me/interests "$FOUR" | status)"
+expect "4개 저장 200"     "200" "$(api "$A" PUT /api/me/interests "$FOUR" | status)"
 expect "4개 저장"         "4"   "$(api "$A" GET /api/me/interests | body | count)"
 expect "중복은 접힘"      "200" "$(api "$A" PUT /api/me/interests '{"categories":["stationery","stationery","packaging","craft","disposable"]}' | status)"
 expect "여전히 4개"       "4"   "$(api "$A" GET /api/me/interests | body | count)"
@@ -86,15 +94,10 @@ api "$B" PUT /api/me/interests '{"categories":["packaging","interior","printed",
 expect "B도 4개"          "4"   "$(api "$B" GET /api/me/interests | body | count)"
 expect "비로그인 401"     "401" "$(curl -s -o /dev/null -w '%{http_code}' -X PUT "$BASE/api/me/interests" -H 'content-type: application/json' --data "$FOUR")"
 
-echo "3. 승인 — 운영자가 둘 다"
-expect "pending manager는 승인 권한 없음 403" "403" "$(api "$B" GET /api/admin/approvals | status)"
-for jar in "$A" "$B"; do
-  uid=$(api "$jar" GET /api/me | body | jget id)
-  APPROVE="{\"userId\":\"$uid\",\"action\":\"approve\"}"
-  api "$ADM" PATCH /api/admin/approvals "$APPROVE" >/dev/null
-done
-expect "A verified" "verified" "$(api "$A" GET /api/me | body | jget orgStatus)"
-expect "verified manager는 우리 기관 승인 가능 200" "200" "$(api "$B" GET /api/admin/approvals | status)"
+echo "3. 승인 화면 — 가입은 바로 verified다. 화면은 반려용으로 남아 있다 (decisions/0008)"
+expect "member는 승인 권한 없음 403" "403" "$(api "$D" GET /api/admin/approvals | status)"
+expect "verified manager는 우리 기관 승인 화면 200" "200" "$(api "$B" GET /api/admin/approvals | status)"
+expect "운영자는 전체 200" "200" "$(api "$ADM" GET /api/admin/approvals | status)"
 # JWT 갱신 — 브라우저는 session.update()로 하지만 curl은 재로그인 (jwt 콜백이 DB를 다시 읽는다)
 login "$A" "a$SUF@dev.local" "기관A 담당자"
 login "$B" "b$SUF@dev.local" "기관B 담당자"

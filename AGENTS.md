@@ -7,7 +7,7 @@
 ```
 web/   @nanum/web   Next.js 16 앱 — MVP 본체. 규칙은 web/AGENTS.md
 ai/    @nanum/ai    사진→게시글 초안. MVP 밖. 규칙은 ai/AGENTS.md
-db/                 schema.sql, seed.sql — 패키지 아님, psql로 직접 적용
+db/                 schema.sql, seed.sql, orgs.sql(청년센터 명단) — 패키지 아님, psql로 직접 적용
 docs/               사람용 문서. 지도는 docs/README.md
 ```
 
@@ -16,12 +16,12 @@ docs/               사람용 문서. 지도는 docs/README.md
 ```bash
 pnpm install                # 한 번. 모든 패키지
 pnpm dev | build | typecheck | lint    # web
-pnpm smoke                  # web curl 한 바퀴 75건. dev 서버 필요
+pnpm smoke                  # web curl 한 바퀴 78건. dev 서버 필요
 pnpm test                   # -r: test 스크립트 있는 패키지 전부 (지금은 ai)
 pnpm --filter @nanum/ai try photo.jpg  # 특정 패키지 스크립트
 ```
 
-DB: `createdb nanum_gotgan && psql -d nanum_gotgan -f db/schema.sql -f db/seed.sql`
+DB: `createdb nanum_gotgan && psql -d nanum_gotgan -f db/schema.sql -f db/seed.sql -f db/orgs.sql`
 
 ## 불변 규칙 — 코드를 바꿀 때 지켜야 하는 것
 

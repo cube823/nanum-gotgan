@@ -98,7 +98,7 @@ export function OnboardingFlow({
 
   function finish() {
     router.refresh();             // 라우터 캐시를 버려야 push가 새 JWT로 요청한다
-    router.push("/pending");
+    router.push("/swipe");        // 기획 정의서 STEP 4 — 바로 자원보기로 (승인 대기 없음)
   }
 
   const phoneOk = /^01\d{8,9}$/.test(phone.replace(/\D/g, ""));

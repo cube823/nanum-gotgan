@@ -53,7 +53,7 @@ git config --local user.email cube823@gmail.com   # Vercel 로그인 계정과 �
 스키마 적용 — Neon 대시보드의 연결 문자열로:
 
 ```bash
-psql "<NEON_CONNECTION_STRING>" -f db/schema.sql -f db/seed.sql
+psql "<NEON_CONNECTION_STRING>" -f db/schema.sql -f db/seed.sql -f db/orgs.sql
 ```
 
 Redeploy → `https://<프로젝트>.vercel.app/login`이 뜨면 됨.

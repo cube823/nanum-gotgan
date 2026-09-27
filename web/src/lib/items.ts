@@ -16,7 +16,8 @@ export const DISTANCE_KM = sql`
       * power(sin(radians(me.lng - COALESCE(i.pickup_lng, o.lng)) / 2), 2)
   )))::numeric, 1)::float`;
 
-/** MVP §4.2 스와이프 피드 — 안 본 것, 우리 기관 것 제외.
+/** MVP §4.2 스와이프 피드 — 우리 기관 것 제외. **안 본 것 먼저, 그다음 본 것(오래전에 본 것부터)** — seen으로 구분.
+ *  본 것을 아예 빼면 물품 수십 개 서비스에선 며칠 만에 피드가 빈다 (2026-09-27 결정, decisions/0004 보강).
  *  관심 자원(기획 정의서 STEP 3)은 **가산점**이지 별도 그룹이 아니다.
  *  그룹으로 나누면 관심 카테고리 물품이 LIMIT을 다 채워 나머지가 영영 안 보인다 —
  *  물품이 안 보이는 건 자원순환 서비스에서 치명적이다. 그래서 등록 시각을 이틀
@@ -28,13 +29,16 @@ export function swipeFeed(userId: string, orgId: string | null, limit = 20) {
       (SELECT count(*)::int FROM bookmarks b WHERE b.item_id = i.id) AS bookmark_count,
       (SELECT count(*)::int FROM transfers t WHERE t.item_id = i.id AND t.status <> 'cancelled') AS chat_count,
       COALESCE(i.pickup_address, o.address) AS org_address,   -- 카드의 "구"는 물품 위치 기준
-      ${DISTANCE_KM} AS distance_km
+      ${DISTANCE_KM} AS distance_km,
+      s.item_id IS NOT NULL AS seen
     FROM items i JOIN organizations o ON o.id = i.org_id JOIN categories c ON c.code = i.category
     LEFT JOIN organizations me ON me.id = ${orgId}::uuid
+    LEFT JOIN swipes s ON s.user_id = ${userId} AND s.item_id = i.id
     WHERE i.status = 'open'
       AND (${orgId}::uuid IS NULL OR i.org_id <> ${orgId}::uuid)
-      AND NOT EXISTS (SELECT 1 FROM swipes s WHERE s.user_id = ${userId} AND s.item_id = i.id)
     ORDER BY
+      s.item_id IS NOT NULL,          -- 안 본 것(false) 먼저
+      s.created_at ASC NULLS FIRST,   -- 본 것끼리는 오래전에 본 것부터 (넘길 때 시각이 갱신돼 돌아간다)
       i.created_at + (CASE WHEN EXISTS (SELECT 1 FROM user_interests ui
                                         WHERE ui.user_id = ${userId} AND ui.category = i.category)
                            THEN interval '2 days' ELSE interval '0' END) DESC
@@ -61,20 +65,49 @@ export async function getItem(id: string): Promise<ItemCard | null> {
   return row ?? null;
 }
 
-/** 내 정보 §05 — 등록 / 신청 / 수령 / 북마크. */
-export function myItems(userId: string, kind: "registered" | "requested" | "received" | "bookmarks") {
-  if (kind === "bookmarks")   // 내린 물품은 뺀다 — 눌러도 404라서
-    return sql<ItemCard[]>`
-      SELECT ${CARD} FROM bookmarks b JOIN items i ON i.id = b.item_id
-      JOIN organizations o ON o.id = i.org_id JOIN categories c ON c.code = i.category
-      WHERE b.user_id = ${userId} AND i.status <> 'withdrawn' ORDER BY b.created_at DESC`;
-  if (kind === "registered")
-    return sql<ItemCard[]>`
-      SELECT ${CARD} FROM items i JOIN organizations o ON o.id = i.org_id JOIN categories c ON c.code = i.category
-      WHERE i.created_by = ${userId} AND i.status <> 'withdrawn' ORDER BY i.created_at DESC`;
-  const status = kind === "received" ? sql`AND t.status = 'completed'` : sql`AND t.status <> 'cancelled'`;
-  return sql<ItemCard[]>`
-    SELECT ${CARD} FROM transfers t JOIN items i ON i.id = t.item_id
-    JOIN organizations o ON o.id = i.org_id JOIN categories c ON c.code = i.category
-    WHERE t.requester_id = ${userId} ${status} ORDER BY t.created_at DESC`;
+/** 내 정보 목록 화면 (기획 정의서 106-294·295·296 + 우리 기관 메뉴). 경로 /me/<kind>. */
+export const PROFILE_LISTS = {
+  bookmarks: "북마크한 물품",
+  requested: "신청한 물품",
+  received: "수령한 물품",
+  "org-received": "기관 수령 물품",
+  "org-registered": "기관 등록 물품",
+  "org-given": "나눔 완료 물품",
+} as const;
+export type ProfileList = keyof typeof PROFILE_LISTS;
+/** transferStatus: 내(또는 우리 기관)가 이 물품에 건 나눔 건 상태. 없으면 null — 알약은 물품 상태로. */
+export type ProfileRow = ItemCard & { transferStatus: string | null };
+
+/** 내 신청·수령은 사람 기준, 우리 기관 메뉴는 org_id 기준. 내린 물품·취소된 신청은 뺀다. */
+export function profileList(kind: ProfileList, userId: string, orgId: string | null) {
+  const cols = sql`${CARD},
+    EXISTS (SELECT 1 FROM bookmarks b WHERE b.user_id = ${userId} AND b.item_id = i.id) AS bookmarked,
+    (SELECT count(*)::int FROM bookmarks b WHERE b.item_id = i.id) AS bookmark_count`;
+  const joins = sql`JOIN organizations o ON o.id = i.org_id JOIN categories c ON c.code = i.category`;
+  switch (kind) {
+    case "bookmarks":
+      return sql<ProfileRow[]>`
+        SELECT ${cols}, (SELECT t.status FROM transfers t WHERE t.item_id = i.id AND t.requester_id = ${userId} AND t.status <> 'cancelled') AS transfer_status
+        FROM bookmarks bm JOIN items i ON i.id = bm.item_id ${joins}
+        WHERE bm.user_id = ${userId} AND i.status <> 'withdrawn' ORDER BY bm.created_at DESC`;
+    case "requested":
+    case "received":
+      return sql<ProfileRow[]>`
+        SELECT ${cols}, t.status AS transfer_status
+        FROM transfers t JOIN items i ON i.id = t.item_id ${joins}
+        WHERE t.requester_id = ${userId} ${kind === "received" ? sql`AND t.status = 'completed'` : sql`AND t.status <> 'cancelled'`}
+        ORDER BY t.created_at DESC`;
+    case "org-received":
+      return sql<ProfileRow[]>`
+        SELECT ${cols}, t.status AS transfer_status
+        FROM transfers t JOIN items i ON i.id = t.item_id ${joins}
+        WHERE t.requester_org = ${orgId} AND t.status = 'completed' ORDER BY t.completed_at DESC`;
+    case "org-registered":
+    case "org-given":
+      return sql<ProfileRow[]>`
+        SELECT ${cols}, NULL AS transfer_status
+        FROM items i ${joins}
+        WHERE i.org_id = ${orgId} ${kind === "org-given" ? sql`AND i.status = 'completed'` : sql`AND i.status <> 'withdrawn'`}
+        ORDER BY i.created_at DESC`;
+  }
 }

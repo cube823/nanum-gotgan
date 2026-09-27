@@ -42,3 +42,10 @@ export async function putImage(file: File): Promise<string> {
   await writeFile(path.join(LOCAL_DIR, name), buf);
   return `/uploads/${name}`;
 }
+
+/** putImage가 돌려준 주소인가. 사용자가 보낸 사진 URL을 저장하기 전에 본다 — 아무 외부 주소나 박히지 않게.
+ *  Blob 호스트의 storeId는 토큰에서 잘라 온 값이라 대문자가 섞일 수 있다 (@vercel/blob). */
+export function isStoredImage(url: string): boolean {
+  return /^\/uploads\/[0-9a-f-]{36}\.(jpg|png|webp)$/.test(url)
+    || /^https:\/\/[A-Za-z0-9]+\.public\.blob\.vercel-storage\.com\/items\/[0-9a-f-]{36}\.(jpg|png|webp)$/.test(url);
+}

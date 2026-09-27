@@ -21,6 +21,38 @@ export function ago(d: Date | string): string {
   return ymd(d);
 }
 
+/** 나눔 건(transfers.status) 상태 알약 — 메시지 목록과 채팅방 물품 카드가 같이 쓴다. 기획 정의서 메시지 목록·14. */
+export const TRANSFER_STATUS: Record<string, { label: string; cls: string }> = {
+  requested: { label: "채팅 중", cls: "bg-brand/10 text-brand" },
+  scheduled: { label: "예약 확정", cls: "bg-accent/10 text-accent" },
+  completed: { label: "나눔 완료", cls: "bg-neutral-100 text-neutral-500" },
+  cancelled: { label: "종료", cls: "bg-neutral-100 text-neutral-400" },
+};
+
+/** 메시지 목록 시각 — 오늘은 "오전 10:35", 어제, N일 전, N주 전, 그 뒤는 "9월 3일".
+ *  서버(UTC)에서 그리므로 날짜 경계는 KST로 자른다. */
+export function chatTime(d: Date | string): string {
+  const x = new Date(d);
+  const day = (t: Date) => Date.parse(t.toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" }));
+  const days = Math.round((day(new Date()) - day(x)) / 86400000);
+  if (days <= 0) return ampm(x);
+  if (days === 1) return "어제";
+  if (days < 7) return `${days}일 전`;
+  if (days < 30) return `${Math.floor(days / 7)}주 전`;
+  return x.toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul", month: "long", day: "numeric" });
+}
+
+/** "오후 2:10" (KST). ko-KR 로캘 포맷은 ICU 버전에 따라 "PM 2:10"이 나와서 직접 만든다 (Node 24 · ICU 78에서 확인). */
+export function ampm(d: Date | string): string {
+  const [h, m] = new Date(d).toLocaleTimeString("en-GB", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit" }).split(":").map(Number);
+  return `${h < 12 ? "오전" : "오후"} ${h % 12 || 12}:${String(m).padStart(2, "0")}`;
+}
+
+/** "서울특별시 성북구 …" → "성북구". 스와이프 카드·내 정보 프로필. */
+export function district(address?: string | null) {
+  return address?.match(/(\S+구)(?=\s)/)?.[1] ?? null;
+}
+
 /** 2026.09.27 */
 export function ymd(d: Date | string): string {
   const x = new Date(d);

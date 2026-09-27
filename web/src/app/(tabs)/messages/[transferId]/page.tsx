@@ -10,7 +10,7 @@ export default async function ChatPage({ params }: { params: Promise<{ transferI
   const { transferId } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(transferId)) notFound();
   const [t] = await sql`
-    SELECT t.id, t.status, t.requester_id, i.id AS item_id, i.name AS item_name, i.status AS item_status, i.created_by,
+    SELECT t.id, t.status, t.requester_id, t.scheduled_at, i.id AS item_id, i.name AS item_name, i.status AS item_status, i.created_by,
       (SELECT url FROM item_photos WHERE item_id = i.id ORDER BY sort_order LIMIT 1) AS thumb,
       COALESCE(owner.real_name, owner.nickname) AS owner_name, oo.name AS owner_org,
       COALESCE(req.real_name, req.nickname) AS req_name, ro.name AS req_org
@@ -27,7 +27,7 @@ export default async function ChatPage({ params }: { params: Promise<{ transferI
     <ChatRoom
       transferId={t.id} me={u.id} owner={owner} requester={requester}
       item={{ id: t.itemId, name: t.itemName, thumb: t.thumb, status: t.itemStatus }}
-      transferStatus={t.status}
+      transferStatus={t.status} scheduledAt={t.scheduledAt ? new Date(t.scheduledAt).toISOString() : null}
     />
   );
 }

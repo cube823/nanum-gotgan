@@ -16,7 +16,7 @@ docs/               사람용 문서. 지도는 docs/README.md
 ```bash
 pnpm install                # 한 번. 모든 패키지
 pnpm dev | build | typecheck | lint    # web
-pnpm smoke                  # web curl 한 바퀴 107건. dev 서버 필요
+pnpm smoke                  # web curl 한 바퀴 139건. dev 서버 필요
 pnpm test                   # -r: test 스크립트 있는 패키지 전부 (지금은 ai)
 pnpm --filter @nanum/ai try photo.jpg  # 특정 패키지 스크립트
 ```
@@ -48,5 +48,5 @@ DB: `createdb nanum_gotgan && psql -d nanum_gotgan -f db/schema.sql -f db/seed.s
 
 - AI 토글(`여러 물건 글쓰기`·`AI로 작성해요`)을 MVP에 붙이지 않는다 — `docs/decisions/0005-ai-deferred.md`
 - 기관 명단을 시딩하지 않는다 — `0001-no-org-seeding.md`
-- 후기·약속 날짜 UI·프로필 수정·활동 점수 — 기획서 팀 코멘트대로 후순위 (북마크는 2026-09-27에 붙였다)
+- 후기·약속 날짜 UI·활동 점수 — 기획서 팀 코멘트대로 후순위 (북마크·프로필 수정은 2026-09-27에 붙였다)
 - Turborepo/Nx — 패키지 2~3개엔 과하다

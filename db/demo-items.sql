@@ -1,4 +1,4 @@
--- 시연용 물품 3개 — Replit 목업(기획팀) 화면에서 옮겼다. 사진은 아직 없다 (원본 파일을 받으면 item_photos에 넣는다).
+-- 시연용 물품 3개 — Replit 목업(기획팀) 화면에서 옮겼다. 사진은 web/public/demo/*.jpg (저장소에 들어 있어 배포와 같이 나간다).
 --
 --   psql -d nanum_gotgan -f db/demo-items.sql
 --
@@ -35,5 +35,17 @@ FROM (VALUES
 ) AS v(subject, category, name, description, quantity, unit, is_used, condition)
 JOIN users u ON u.auth_provider = 'dev' AND u.auth_subject = v.subject
 WHERE NOT EXISTS (SELECT 1 FROM items i WHERE i.org_id = u.org_id AND i.name = v.name AND i.status <> 'withdrawn');
+
+-- 사진 — 물품당 1장. 이미 사진이 있는 물품은 건드리지 않는다.
+INSERT INTO item_photos (item_id, url, sort_order)
+SELECT i.id, v.url, 0
+FROM (VALUES
+  ('demo-kim-narae',     '크래프트 박스 5박스', '/demo/01-kraft-boxes.jpg'),
+  ('demo-park-junyoung', '지관통 20개',         '/demo/02-cardboard-tubes.jpg'),
+  ('demo-lee-seohyun',   '조화 식물 3개',       '/demo/03-artificial-plants.jpg')
+) AS v(subject, name, url)
+JOIN users u ON u.auth_provider = 'dev' AND u.auth_subject = v.subject
+JOIN items i ON i.created_by = u.id AND i.name = v.name AND i.status <> 'withdrawn'
+WHERE NOT EXISTS (SELECT 1 FROM item_photos p WHERE p.item_id = i.id);
 
 COMMIT;

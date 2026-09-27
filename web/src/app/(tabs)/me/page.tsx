@@ -1,81 +1,79 @@
+import Link from "next/link";
 import { sql } from "@/lib/db";
 import { requireUser } from "@/lib/session";
-import { myItems } from "@/lib/items";
-import { ItemGrid } from "@/components/ItemGrid";
-import { WithdrawButton } from "./WithdrawButton";
+import { district } from "@/lib/labels";
+import { Avatar } from "./Avatar";
 import { SignOutButton } from "./SignOutButton";
 
-const TABS = { registered: "등록", requested: "신청", received: "수령", bookmarks: "북마크" } as const;
-type Tab = keyof typeof TABS;
+// 선 아이콘 — 탭바와 같은 24px · 1.8 선 굵기. 이모지는 기기마다 모양이 달라 쓰지 않는다.
+const QUICK = [
+  { href: "/me/bookmarks", label: "북마크",
+    icon: <path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z" /> },
+  { href: "/me/requested", label: "신청물품",
+    icon: <><rect x="5.5" y="4.5" width="13" height="16" rx="2" /><path d="M9.5 4.5V3.5h5v1M9 10h6M9 13.5h6M9 17h3.5" /></> },
+  { href: "/me/received", label: "수령물품",
+    icon: <><path d="M4 8l8-4 8 4v8l-8 4-8-4z" /><path d="M4 8l8 4 8-4M12 12v8" /></> },
+];
+// 우리 기관 후기는 뺐다 — 후기 기능이 후순위라 갈 곳이 없다. 설정(비밀번호 변경)도 없다 — OAuth 로그인뿐이라 맨 아래 로그아웃만.
+const ORG_MENU = [
+  { href: "/me/org-received", label: "기관 수령 물품" },
+  { href: "/me/org-registered", label: "기관 등록 물품" },
+  { href: "/me/org-given", label: "나눔 완료 물품" },
+  { href: "/me/members", label: "기관 구성원 보기" },
+];
 
-// 화면 12 — 05 기획서. 프로필 + 등록/신청/수령/북마크. 등록에 내리기. 북마크는 스와이프 하트로 쌓인다.
-export default async function MePage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+function Chevron() {
+  return <svg aria-hidden viewBox="0 0 24 24" className="size-4 shrink-0 text-neutral-300" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>;
+}
+
+// 기획 정의서 106-291 내 정보. 프로필 카드 → 수정, 북마크·신청·수령, 우리 기관 메뉴, 로그아웃.
+export default async function MePage() {
   const u = await requireUser();
-  const { tab: raw } = await searchParams;
-  const tab: Tab = (raw && raw in TABS ? raw : "registered") as Tab;
-
-  const [[org], items, [counts]] = await Promise.all([
-    u.orgId ? sql`SELECT name, org_type FROM organizations WHERE id = ${u.orgId}` : Promise.resolve([null]),
-    myItems(u.id, tab),
-    sql`SELECT
-      (SELECT count(*)::int FROM transfers t JOIN items i ON i.id = t.item_id WHERE i.created_by = ${u.id} AND t.status = 'completed') AS given,
-      (SELECT count(*)::int FROM transfers WHERE requester_id = ${u.id} AND status = 'completed') AS received`,
-  ]);
+  const [org] = u.orgId ? await sql`SELECT name, address FROM organizations WHERE id = ${u.orgId}` : [];
+  const where = [org?.name ?? "소속 없음", district(org?.address)].filter(Boolean).join(" · ");
 
   return (
-    <main className="flex-1 px-4 pt-6">
-      <div className="flex items-center gap-4">
-        <div className="size-16 rounded-full bg-neutral-200 overflow-hidden shrink-0">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          {u.profileImage && <img src={u.profileImage} alt="" className="size-full object-cover" />}
-        </div>
-        <div className="min-w-0">
-          <p className="text-lg font-bold truncate">{u.nickname}</p>
-          <p className="text-sm text-neutral-500 truncate">
-            {org?.name ?? "소속 없음"}
-            {u.orgStatus !== "verified" && <span className="ml-1 chip bg-amber-100 text-amber-800">확인 중</span>}
-            {u.orgRole === "manager" && u.orgStatus === "verified" && <span className="ml-1 chip bg-brand/10 text-brand-dark">기관 담당자</span>}
-          </p>
-          <p className="text-xs text-neutral-400">나눔 {counts.given}회 · 수령 {counts.received}회</p>
-        </div>
-      </div>
+    <main className="flex-1 space-y-3 bg-white px-4 pb-6 pt-6">
+      <h1 className="px-1 pb-3 text-2xl font-extrabold">내 정보</h1>
 
-      <div className="mt-6 flex rounded-xl bg-neutral-100 p-1">
-        {(Object.keys(TABS) as Tab[]).map((k) => (
-          <a key={k} href={`/me?tab=${k}`}
-            className={`flex-1 text-center text-sm py-2 rounded-lg ${tab === k ? "bg-white font-semibold shadow-sm" : "text-neutral-500"}`}>
-            {TABS[k]}
-          </a>
+      <section className="rounded-3xl border border-neutral-200 p-4">
+        <div className="flex items-center gap-4">
+          <Avatar src={u.profileImage} className="size-14" />
+          <div className="min-w-0">
+            <p className="truncate text-lg font-bold">{u.realName ?? u.nickname}</p>
+            <p className="truncate text-sm text-neutral-500">{where}</p>
+          </div>
+        </div>
+        <Link href="/me/edit" className="mt-4 block rounded-2xl border border-brand/20 bg-brand/10 py-3 text-center text-sm font-bold text-brand">프로필 수정</Link>
+      </section>
+
+      <nav aria-label="내 물품" className="grid grid-cols-3 divide-x divide-neutral-200 rounded-3xl border border-neutral-200">
+        {QUICK.map((q) => (
+          <Link key={q.href} href={q.href} className="flex flex-col items-center gap-2 py-5 text-[13px] text-neutral-500">
+            <svg aria-hidden viewBox="0 0 24 24" className="size-7 text-brand" fill="none" stroke="currentColor"
+              strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">{q.icon}</svg>
+            {q.label}
+          </Link>
         ))}
-      </div>
+      </nav>
 
-      <div className="mt-4">
-        {tab === "registered" ? (
-          <ul className="space-y-3">
-            {items.length === 0 && <p className="py-16 text-center text-neutral-400 text-sm">등록한 물품이 없어요.</p>}
-            {items.map((it) => (
-              <li key={it.id} className="flex gap-3 items-center">
-                <a href={`/items/${it.id}`} className="flex gap-3 flex-1 min-w-0">
-                  <div className="size-16 rounded-xl bg-neutral-100 overflow-hidden shrink-0">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    {it.photos[0] && <img src={it.photos[0]} alt="" className="size-full object-cover" />}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-semibold truncate">{it.name}</p>
-                    <p className="text-xs text-neutral-500">{it.categoryLabel} · {it.quantity}{it.quantityUnit}</p>
-                    <p className="text-xs">{{ open: "나눔 중", reserved: "예약됨", completed: "나눔 완료" }[it.status as string]}</p>
-                  </div>
-                </a>
-                {it.status !== "completed" && <WithdrawButton itemId={it.id} />}
+      {u.orgId && (
+        <section className="rounded-3xl border border-neutral-200 px-5 pt-4">
+          <h2 className="text-[13px] font-bold text-neutral-500">우리 기관</h2>
+          <ul className="divide-y divide-neutral-200">
+            {ORG_MENU.map((m) => (
+              <li key={m.href}>
+                <Link href={m.href} className="flex items-center gap-4 py-4">
+                  <span className="flex-1 text-[15px]">{m.label}</span>
+                  <Chevron />
+                </Link>
               </li>
             ))}
           </ul>
-        ) : (
-          <ItemGrid items={items} empty={{ requested: "신청한 물품이 없어요.", received: "받은 물품이 없어요.", bookmarks: "하트를 누른 물품이 여기에 모여요." }[tab]} />
-        )}
-      </div>
+        </section>
+      )}
 
-      <div className="mt-10 pb-6"><SignOutButton /></div>
+      <SignOutButton />
     </main>
   );
 }

@@ -21,7 +21,7 @@ items:     open      ⇄ reserved  ──→ completed
 
 | | |
 |---|---|
-| 목록 | `web/src/app/(tabs)/messages/page.tsx` — 안 읽음 닷, 물품 상태 뱃지 |
+| 목록 | `web/src/app/(tabs)/messages/page.tsx` — 탭(`?tab=requested`·`mine`), 안 읽음 수 배지, 상태 알약(`lib/labels` `TRANSFER_STATUS`), 탭별 빈 상태 |
 | 채팅방 | `(tabs)/messages/[transferId]/page.tsx` (서버, 상단 물품) + `ChatRoom.tsx` (5초 폴링, 버튼 2개) |
 | API | `api/transfers` POST (신청=방 생성, ON CONFLICT), `api/transfers/[id]` PATCH (schedule/unschedule/complete), `api/transfers/[id]/messages` GET(`?after=`)/POST |
 

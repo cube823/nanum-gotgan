@@ -2,6 +2,7 @@ import { sql } from "@/lib/db";
 import { api, requireUser, requireVerified, HttpError } from "@/lib/session";
 import { swipeFeed, listFeed } from "@/lib/items";
 import { CONDITIONS } from "@/lib/labels";
+import { isStoredImage } from "@/lib/storage";
 
 export const GET = api(async (req) => {
   const u = await requireUser();
@@ -29,6 +30,8 @@ export const POST = api(async (req) => {
   if (!Number.isInteger(quantity) || quantity < 1) throw new HttpError(400, "수량은 1 이상이어야 해요.");
   if (!CONDITION_SET.has(b.condition)) throw new HttpError(400, "상태를 골라 주세요.");
   if (photos.length < 1 || photos.length > 10) throw new HttpError(400, "사진은 1~10장이어야 해요.");
+  // /api/uploads로 올린 것만. 빈 문자열·외부 주소가 item_photos에 박히면 카드에 깨진 사진이 뜬다.
+  if (!photos.every(isStoredImage)) throw new HttpError(400, "사진을 다시 올려 주세요.");
   if (b.fundingSource && !FUNDING.has(b.fundingSource)) throw new HttpError(400, "취득 재원이 올바르지 않아요.");
   const history = String(b.history ?? "").trim() || null;   // 선택. 단답형
   if (history && history.length > 200) throw new HttpError(400, "물품 히스토리는 200자 이하로 적어 주세요.");

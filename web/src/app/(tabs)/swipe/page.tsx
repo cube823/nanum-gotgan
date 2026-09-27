@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { ItemCard } from "@/lib/types";
-import { CONDITION_LABEL } from "@/lib/labels";
+import { CONDITION_LABEL, district } from "@/lib/labels";
 
 /**
  * 02 기획서: 왼쪽으로 밀기·X = 다음, 오른쪽으로 밀기 = 이전, ↑ = 상세(시트), ♡ = 북마크 토글, 돋보기 = 목록.
@@ -115,8 +115,14 @@ export default function SwipePage() {
           <div className="flex-1 rounded-2xl bg-neutral-50 grid place-items-center text-center p-8">
             <div>
               <p className="text-lg font-semibold">{cards.length === 0 ? "아직 올라온 물품이 없어요" : "다 보셨어요"}</p>
-              <p className="mt-2 text-sm text-neutral-500">전체 목록에서 다시 찾을 수 있어요.</p>
-              <Link href="/items" className="btn-brand mt-6">전체 목록 보기</Link>
+              <p className="mt-2 text-sm text-neutral-500">{cards.length === 0 ? "전체 목록에서 다시 찾을 수 있어요." : "본 물품을 처음부터 다시 볼 수 있어요."}</p>
+              <div className="mt-6 flex justify-center gap-2">
+                {cards.length > 0 && (
+                  // 새로 불러오면 안 본 것 → 오래전에 본 것 순으로 다시 온다 (lib/items.ts swipeFeed)
+                  <button onClick={() => { setCards(null); setIdx(0); fetch("/api/items").then((r) => r.json()).then(setCards); }} className="btn-brand">다시 보기</button>
+                )}
+                <Link href="/items" className={cards.length > 0 ? "btn-ghost" : "btn-brand"}>전체 목록 보기</Link>
+              </div>
             </div>
           </div>
         )}
@@ -182,13 +188,17 @@ function CardFace({ card, photoIdx, children }: { card: ItemCard; photoIdx: numb
         </div>
       )}
       <div className="absolute top-8 inset-x-3.5 flex justify-between items-start pointer-events-none text-white text-sm font-semibold">
-        {district(card.orgAddress) ? (
-          <span className="flex items-center gap-1 rounded-full bg-black/45 px-3 py-1.5 backdrop-blur">
-            <svg aria-hidden viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth={2}><path d="M12 21s7-6.2 7-11.5a7 7 0 0 0-14 0C5 14.8 12 21 12 21z" /><circle cx="12" cy="9.5" r="2.5" /></svg>
-            {district(card.orgAddress)}
-            {card.distanceKm != null && <> · {card.distanceKm}km</>}
-          </span>
-        ) : <span />}
+        <span className="flex flex-col items-start gap-1.5">
+          {district(card.orgAddress) && (
+            <span className="flex items-center gap-1 rounded-full bg-black/45 px-3 py-1.5 backdrop-blur">
+              <svg aria-hidden viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth={2}><path d="M12 21s7-6.2 7-11.5a7 7 0 0 0-14 0C5 14.8 12 21 12 21z" /><circle cx="12" cy="9.5" r="2.5" /></svg>
+              {district(card.orgAddress)}
+              {card.distanceKm != null && <> · {card.distanceKm}km</>}
+            </span>
+          )}
+          {/* 새 물품을 다 본 뒤 다시 도는 카드 */}
+          {card.seen && <span className="rounded-full bg-white/85 px-2.5 py-1 text-xs font-bold text-neutral-700 backdrop-blur">다시 보는 물품</span>}
+        </span>
         <span className="flex items-center gap-2.5 rounded-full bg-black/45 px-3 py-1.5 backdrop-blur">
           <span className="flex items-center gap-1" aria-label={`북마크 ${card.bookmarkCount ?? 0}`}>
             <svg aria-hidden viewBox="0 0 24 24" className="size-4" fill="currentColor"><path d="M12 20s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 12 7.2 4.3 4.3 0 0 1 19.5 10c0 5.4-7.5 10-7.5 10z" /></svg>
@@ -214,9 +224,4 @@ function CardFace({ card, photoIdx, children }: { card: ItemCard; photoIdx: numb
       </div>
     </div>
   );
-}
-
-/** "서울특별시 성북구 …" → "성북구". 거리는 swipeFeed의 distance_km (좌표 없으면 숨김). */
-function district(address?: string | null) {
-  return address?.match(/(\S+구)(?=\s)/)?.[1] ?? null;
 }

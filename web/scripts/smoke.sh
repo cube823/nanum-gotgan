@@ -145,6 +145,10 @@ RED_NO="{\"category\":\"electronics\",\"name\":\"선풍기\",\"quantity\":1,\"co
 RED_OK="{\"category\":\"electronics\",\"name\":\"선풍기\",\"quantity\":1,\"condition\":\"중\",\"isUsed\":true,\"approvalConfirmed\":true,\"onLedger\":true,\"fundingSource\":\"자체예산\",\"photos\":[\"$URL\"]}"
 BAD_COND="{\"category\":\"packaging\",\"name\":\"x\",\"quantity\":1,\"condition\":\"새것\",\"isUsed\":false,\"photos\":[\"$URL\"]}"
 expect "표시 라벨을 그대로 보내면 400" "400" "$(api "$A" POST /api/items "$BAD_COND" | status)"
+EMPTY_PHOTO="{\"category\":\"packaging\",\"name\":\"x\",\"quantity\":1,\"condition\":\"상\",\"isUsed\":false,\"photos\":[\"\"]}"
+EXT_PHOTO="{\"category\":\"packaging\",\"name\":\"x\",\"quantity\":1,\"condition\":\"상\",\"isUsed\":false,\"photos\":[\"https://evil.example/x.jpg\"]}"
+expect "물품 빈 사진 주소 400"   "400" "$(api "$A" POST /api/items "$EMPTY_PHOTO" | status)"
+expect "물품 외부 사진 주소 400" "400" "$(api "$A" POST /api/items "$EXT_PHOTO" | status)"
 expect "🔴 전기류 승인 없이 400" "400" "$(api "$A" POST /api/items "$RED_NO" | status)"
 expect "🔴 전기류 승인 있으면 201" "201" "$(api "$A" POST /api/items "$RED_OK" | status)"
 
@@ -153,7 +157,11 @@ expect "B 피드에 있음" "True"  "$(api "$B" GET /api/items | body | has $ITE
 expect "A 피드엔 없음 (같은 기관)" "False" "$(api "$A" GET /api/items | body | has $ITEM)"
 SW="{\"itemId\":\"$ITEM\"}"
 api "$B" POST /api/swipes "$SW" >/dev/null
-expect "넘긴 뒤 피드에서 사라짐" "False" "$(api "$B" GET /api/items | body | has $ITEM)"
+# 본 물품은 빠지지 않고 뒤로 간다 — 안 본 것 먼저, 본 것은 seen=True (2026-09-27)
+expect "넘긴 뒤에도 피드에 남음" "True" "$(api "$B" GET /api/items | body | has $ITEM)"
+expect "넘긴 물품은 seen" "True" "$(api "$B" GET /api/items | body | python3 -c "import sys,json; print(next(i['seen'] for i in json.load(sys.stdin) if i['id']=='$ITEM'))")"
+expect "안 본 물품이 앞 (1번은 넘긴 물품이 아님)" "False" "$(api "$B" GET /api/items | body | python3 -c "import sys,json; print(json.load(sys.stdin)[0]['id']=='$ITEM')")"
+expect "다시 넘겨도 200" "200" "$(api "$B" POST /api/swipes "$SW" | status)"
 expect "목록엔 여전히 있음" "True" "$(api "$B" GET "/api/items?mode=list" | body | has $ITEM)"
 expect "카테고리 필터" "True" "$(api "$B" GET "/api/items?mode=list&category=packaging" | body | has $ITEM)"
 
@@ -219,9 +227,19 @@ T=$(api "$B" POST /api/transfers "$SW" | body | jget id)
 T2=$(api "$B" POST /api/transfers "$SW" | body | jget id)
 expect "재신청해도 같은 방" "$T" "$T2"
 expect "B 메시지 201" "201" "$(api "$B" POST "/api/transfers/$T/messages" '{"body":"안녕하세요, 봉투 필요해요"}' | status)"
+expect "A 탭바 안 읽음 1" "1" "$(api "$A" GET /api/me/unread | body | jget count)"
 expect "A 메시지 201" "201" "$(api "$A" POST "/api/transfers/$T/messages" '{"body":"네, 내일 오세요"}' | status)"
 expect "A가 이력 2건" "2" "$(api "$A" GET "/api/transfers/$T/messages" | body | count)"
+expect "A가 방을 열면 안 읽음 0" "0" "$(api "$A" GET /api/me/unread | body | jget count)"
+expect "B는 A의 답장 1건 안 읽음" "1" "$(api "$B" GET /api/me/unread | body | jget count)"
 expect "제3자 열람 403" "403" "$(api "$ADM" GET "/api/transfers/$T/messages" | status)"
+# 메시지 목록 탭 — 서버 렌더 HTML에서 확인. 이름은 채팅방과 같게 실명(realName).
+see() { curl -s -b "$1" "$BASE$2" | grep -q "$3" && echo yes || echo no; }
+expect "A 등록한 물품 탭에 B 실명"     "yes" "$(see "$A" "/messages?tab=mine" "기관B 담당")"
+expect "A 신청한 물품 탭은 빈 상태"     "yes" "$(see "$A" "/messages?tab=requested" "신청한 물품이 없어요")"
+expect "B 신청한 물품 탭에 물품"        "yes" "$(see "$B" "/messages?tab=requested" "크라프트 종이봉투")"
+expect "B 등록한 물품 탭은 빈 상태"     "yes" "$(see "$B" "/messages?tab=mine" "등록한 물품이 없어요")"
+expect "A 목록 상태 알약 채팅 중"       "yes" "$(see "$A" "/messages" "채팅 중")"
 
 echo "7. 예약 → 완료 (DB-SCHEMA §3 검산표)"
 expect "B가 예약 시도 403" "403" "$(api "$B" PATCH "/api/transfers/$T" '{"action":"schedule"}' | status)"
@@ -270,14 +288,34 @@ expect "완료된 물품 내리기 400" "400" "$(api "$A" PATCH "/api/items/$ITE
 
 echo "9. 페이지 렌더 (200)"
 BID=$(api "$B" GET /api/me | body | jget id)
-for p in /swipe /items "/items/$ITEM" /new /messages "/messages/$T" /me "/me?tab=received" "/me?tab=bookmarks" "/users/$BID"; do
+for p in /swipe /items "/items/$ITEM" /new /messages "/messages/$T" /me /me/bookmarks /me/requested /me/received /me/org-received /me/org-registered /me/org-given /me/members /me/edit "/users/$BID"; do
   expect "GET $p" "200" "$(curl -s -o /dev/null -b "$A" -w '%{http_code}' "$BASE$p")"
 done
 expect "GET /admin/approvals (운영자)" "200" "$(curl -s -o /dev/null -b "$ADM" -w '%{http_code}' "$BASE/admin/approvals")"
 expect "GET /admin/approvals (B, manager verified) 200" "200" "$(curl -s -o /dev/null -b "$B" -w '%{http_code}' "$BASE/admin/approvals")"
+expect "없는 내 정보 목록 404" "404" "$(curl -s -o /dev/null -b "$A" -w '%{http_code}' "$BASE/me/nope")"
+
+echo "9b. 내 정보 목록 — 사람 기준 / 기관 기준 (기획 정의서 106-294~296)"
+expect "B 수령한 물품에 완료 물품"       "yes" "$(see "$B" /me/received "크라프트 종이봉투")"
+expect "B 기관 수령 물품에도"            "yes" "$(see "$B" /me/org-received "크라프트 종이봉투")"
+expect "A 나눔 완료 물품에"              "yes" "$(see "$A" /me/org-given "크라프트 종이봉투")"
+expect "A 수령한 물품은 비어 있음"       "yes" "$(see "$A" /me/received "받은 물품이 없어요")"
+expect "A 구성원에 본인"                 "yes" "$(see "$A" /me/members "기관A 담당")"
+
+echo "9c. 프로필 수정 (기획 정의서 106-293) — 이름·사진"
+NEWNAME='{"realName":"기관A 새이름"}'
+BADIMG='{"realName":"기관A 새이름","profileImage":"https://evil.example/x.png"}'
+expect "이름 1자 400"          "400" "$(api "$A" PATCH /api/me/profile '{"realName":"김"}' | status)"
+expect "외부 사진 주소 400"    "400" "$(api "$A" PATCH /api/me/profile "$BADIMG" | status)"
+expect "이름 바꾸기 200"       "200" "$(api "$A" PATCH /api/me/profile "$NEWNAME" | status)"
+expect "바뀐 이름"             "기관A 새이름" "$(api "$A" GET /api/me | body | jget realName)"
+expect "전화번호는 그대로"     "01012345678" "$(api "$A" GET /api/me | body | jget phone)"
+expect "내 정보에 바뀐 이름"   "yes" "$(see "$A" /me "기관A 새이름")"
+
 expect "없는 사용자 프로필 404" "404" "$(curl -s -o /dev/null -b "$A" -w '%{http_code}' "$BASE/users/00000000-0000-0000-0000-000000000000")"
 expect "uuid 아닌 프로필 404"   "404" "$(curl -s -o /dev/null -b "$A" -w '%{http_code}' "$BASE/users/abc")"
 expect "GET / 미로그인 → /login" "307" "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/")"
+expect "GET /logo.png 미로그인 200 (정적 파일은 게이트 밖)" "200" "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/logo.png")"
 
 echo
 echo "통과 $PASS · 실패 $FAIL"

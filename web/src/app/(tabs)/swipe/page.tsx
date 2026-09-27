@@ -167,14 +167,15 @@ function CardFace({ card, photoIdx, children }: { card: ItemCard; photoIdx: numb
     <div className="relative size-full rounded-3xl overflow-hidden bg-neutral-100 shadow-sm">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       {card.photos[photoIdx] && <img src={card.photos[photoIdx]} alt={card.name} draggable={false} className="absolute inset-0 size-full object-cover pointer-events-none" />}
-      {card.photos.length > 1 && (
-        <div className="absolute top-2.5 inset-x-0 flex justify-center gap-1 pointer-events-none">
+      {/* 사진 장수 — 1장이어도 보인다 (기획 정의서 09: ▬ • •, 현재 사진이 긴 막대) */}
+      {card.photos.length > 0 && (
+        <div className="absolute top-3 inset-x-0 flex justify-center gap-1 pointer-events-none">
           {card.photos.map((_, i) => (
             <span key={i} className={`h-1.5 rounded-full transition-all ${i === photoIdx ? "w-5 bg-white" : "w-1.5 bg-white/50"}`} />
           ))}
         </div>
       )}
-      <div className="absolute top-5 inset-x-3.5 flex justify-between items-start pointer-events-none text-white text-sm font-semibold">
+      <div className="absolute top-8 inset-x-3.5 flex justify-between items-start pointer-events-none text-white text-sm font-semibold">
         {district(card.orgAddress) ? (
           <span className="flex items-center gap-1 rounded-full bg-black/45 px-3 py-1.5 backdrop-blur">
             <svg aria-hidden viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth={2}><path d="M12 21s7-6.2 7-11.5a7 7 0 0 0-14 0C5 14.8 12 21 12 21z" /><circle cx="12" cy="9.5" r="2.5" /></svg>

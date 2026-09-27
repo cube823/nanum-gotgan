@@ -30,6 +30,8 @@ export const POST = api(async (req) => {
   if (!CONDITION_SET.has(b.condition)) throw new HttpError(400, "상태를 골라 주세요.");
   if (photos.length < 1 || photos.length > 10) throw new HttpError(400, "사진은 1~10장이어야 해요.");
   if (b.fundingSource && !FUNDING.has(b.fundingSource)) throw new HttpError(400, "취득 재원이 올바르지 않아요.");
+  const history = String(b.history ?? "").trim() || null;   // 선택. 단답형
+  if (history && history.length > 200) throw new HttpError(400, "물품 히스토리는 200자 이하로 적어 주세요.");
 
   const [cat] = await sql`SELECT code, risk_level FROM categories WHERE code = ${String(b.category)}`;
   if (!cat) throw new HttpError(400, "카테고리를 골라 주세요.");
@@ -39,9 +41,9 @@ export const POST = api(async (req) => {
 
   const id = await sql.begin(async (tx) => {
     const [item] = await tx`
-      INSERT INTO items (org_id, created_by, category, name, description, quantity, quantity_unit,
+      INSERT INTO items (org_id, created_by, category, name, description, history, quantity, quantity_unit,
                          is_used, condition, on_ledger, approval_confirmed, funding_source)
-      VALUES (${u.orgId}, ${u.id}, ${cat.code}, ${name}, ${String(b.description ?? "").trim() || null},
+      VALUES (${u.orgId}, ${u.id}, ${cat.code}, ${name}, ${String(b.description ?? "").trim() || null}, ${history},
               ${quantity}, ${String(b.quantityUnit ?? "개").trim() || "개"},
               ${!!b.isUsed}, ${b.condition}, ${!!b.onLedger}, ${!!b.approvalConfirmed}, ${b.fundingSource ?? null})
       RETURNING id`;

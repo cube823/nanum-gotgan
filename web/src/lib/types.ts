@@ -43,6 +43,7 @@ export type Item = {
   category: string;
   name: string;
   description: string | null;
+  history: string | null;
   quantity: number;
   quantityUnit: string;
   isUsed: boolean;

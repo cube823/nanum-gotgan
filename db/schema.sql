@@ -73,6 +73,7 @@ CREATE TABLE items (
   category      text NOT NULL REFERENCES categories(code),
   name          text NOT NULL,
   description   text,
+  history       text,           -- 물품 히스토리(선택, 단답). 등록하기 기획(Notion 03) — "어떤 히스토리가 있는지"
   quantity      integer NOT NULL CHECK (quantity > 0),
   quantity_unit text NOT NULL DEFAULT '개',
   is_used       boolean NOT NULL,

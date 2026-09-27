@@ -88,6 +88,11 @@ export async function ItemDetail({ id, sheet = false }: { id: string; sheet?: bo
         <hr className="my-5 border-neutral-200" />
 
         {item.description && <p className="whitespace-pre-wrap text-[15px] leading-7 text-neutral-900">{item.description}</p>}
+        {item.history && (
+          <p className="mt-3 rounded-xl border border-neutral-200 px-4 py-3 text-sm text-neutral-600">
+            <span className="mr-2 font-bold text-neutral-800">물품 히스토리</span>{item.history}
+          </p>
+        )}
 
         <dl className="mt-6 space-y-4 rounded-2xl bg-neutral-100/70 px-5 py-5 text-sm">
           {[

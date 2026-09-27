@@ -16,6 +16,9 @@ export default async function NewItemPage() {
       </main>
     );
   }
-  const cats = await sql<Category[]>`SELECT code, label, risk_level, notice FROM categories ORDER BY sort_order`;
-  return <NewItemForm categories={cats} />;
+  const [cats, [org]] = await Promise.all([
+    sql<Category[]>`SELECT code, label, risk_level, notice FROM categories ORDER BY sort_order`,
+    sql`SELECT name FROM organizations WHERE id = ${u.orgId}`,
+  ]);
+  return <NewItemForm categories={cats} orgName={org?.name ?? ""} />;
 }

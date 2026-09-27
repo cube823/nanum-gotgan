@@ -4,7 +4,23 @@
 # 계정 3개(운영자·기관A·기관B)로 등록→스와이프→채팅→예약→완료→내리기 + 막혀야 하는 경로.
 set -euo pipefail
 BASE=${BASE:-http://localhost:3000}
-J=$(mktemp -d); trap 'rm -rf "$J"' EXIT
+J=$(mktemp -d)
+HERE=$(cd "$(dirname "$0")" && pwd)
+# 끝나면 이번 실행이 만든 계정·기관·물품을 지운다 (db/cleanup-test-data.sql). 안 지우면 돌릴 때마다 쌓인다.
+# 로컬 DB일 때만. 남겨서 보고 싶으면 SMOKE_KEEP=1.
+cleanup() {
+  rm -rf "$J"
+  [ -z "${SUF:-}" ] && return                      # 계정을 만들기 전에 끝났다
+  [ -n "${SMOKE_KEEP:-}" ] && { echo "(SMOKE_KEEP — 테스트 데이터 남김, 접미사 $SUF)"; return; }
+  case "${URL:-}" in /uploads/*) rm -f "$HERE/../public$URL";; esac   # 올린 사진 파일 (Blob URL이면 그대로 둔다)
+  local db; db=$(grep '^DATABASE_URL=' "$HERE/../.env.local" 2>/dev/null | cut -d= -f2-)
+  case "$db" in
+    *localhost*|*127.0.0.1*) psql "$db" -q -v re="^[a-z]${SUF}@dev\\.local\$" -f "$HERE/../../db/cleanup-test-data.sql" >/dev/null \
+                               && echo "(테스트 데이터 정리함)" || echo "(테스트 데이터 정리 실패 — db/cleanup-test-data.sql)";;
+    *) echo "(DATABASE_URL이 로컬이 아니라 정리 안 함)";;
+  esac
+}
+trap cleanup EXIT
 PASS=0; FAIL=0
 ok()   { PASS=$((PASS+1)); echo "  ✓ $1"; }
 fail() { FAIL=$((FAIL+1)); echo "  ✗ $1"; }
@@ -144,10 +160,13 @@ expect "카테고리 필터" "True" "$(api "$B" GET "/api/items?mode=list&catego
 echo "5b. 추천 정렬 — B의 관심 자원이 최신순보다 앞에"
 # B의 관심은 event/interior/printed/banner. interior를 먼저, 관심 밖 stationery를 나중에 등록한다.
 # 최신순만이라면 나중에 등록한 stationery가 1번이어야 한다 — 관심이 이기면 정렬이 도는 것이다.
-OLD_INT="{\"category\":\"interior\",\"name\":\"액자 세트\",\"quantity\":3,\"condition\":\"중\",\"isUsed\":true,\"photos\":[\"$URL\"]}"
+OLD_INT="{\"category\":\"interior\",\"name\":\"액자 세트\",\"history\":\"작년 청년주간 행사 때 쓴 액자\",\"quantity\":3,\"condition\":\"중\",\"isUsed\":true,\"photos\":[\"$URL\"]}"
 NEW_OFF="{\"category\":\"stationery\",\"name\":\"네임펜 한 박스\",\"quantity\":50,\"condition\":\"상\",\"isUsed\":false,\"photos\":[\"$URL\"]}"
 INT_ID=$(api "$A" POST /api/items "$OLD_INT" | body | jget id)
 OFF_ID=$(api "$A" POST /api/items "$NEW_OFF" | body | jget id)
+expect "물품 히스토리 저장" "작년 청년주간 행사 때 쓴 액자" "$(api "$B" GET "/api/items/$INT_ID" | body | jget history)"
+LONG_HIST="{\"category\":\"interior\",\"name\":\"긴 히스토리\",\"history\":\"$(printf '가%.0s' $(seq 201))\",\"quantity\":1,\"condition\":\"중\",\"isUsed\":true,\"photos\":[\"$URL\"]}"
+expect "히스토리 200자 초과 400" "400" "$(api "$A" POST /api/items "$LONG_HIST" | status)"
 expect "관심(interior)이 1번" "$INT_ID" "$(api "$B" GET /api/items | body | first)"
 # A는 관심을 stationery 포함으로 골랐지만 둘 다 자기 기관 것이라 안 보인다 — 정렬이 소속 규칙을 뚫지 않는다.
 expect "A 피드엔 자기 것 없음" "False" "$(api "$A" GET /api/items | body | has $OFF_ID)"

@@ -54,7 +54,9 @@ export const POST = api(async (req, { params }) => {
 
 ```bash
 pnpm typecheck && pnpm lint && pnpm build
-pnpm dev &  pnpm smoke      # 98건
+pnpm dev &  pnpm smoke      # 100건
 ```
+
+smoke는 끝날 때 자기 실행 번호의 계정·기관·물품을 지운다(`db/cleanup-test-data.sql`, 로컬 DB일 때만). 남겨서 보려면 `SMOKE_KEEP=1 pnpm smoke`. 예전에 쌓인 smoke 데이터는 `psql -d nanum_gotgan -v re='^[a-f][0-9]+@dev\.local$' -f db/cleanup-test-data.sql`.
 
 `.env.local`이 없으면 `.env.example`을 복사. `ADMIN_EMAILS`에 있는 이메일로 OAuth 로그인하면 운영자. 로그인 화면에 개발용 폼은 없다 — `dev` 프로바이더는 smoke가 curl로 `/api/auth/callback/dev`를 직접 부르는 데만 쓴다.

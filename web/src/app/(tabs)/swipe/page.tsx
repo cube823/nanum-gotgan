@@ -167,8 +167,8 @@ function CardFace({ card, photoIdx, children }: { card: ItemCard; photoIdx: numb
     <div className="relative size-full rounded-3xl overflow-hidden bg-neutral-100 shadow-sm">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       {card.photos[photoIdx] && <img src={card.photos[photoIdx]} alt={card.name} draggable={false} className="absolute inset-0 size-full object-cover pointer-events-none" />}
-      {/* 사진 장수 — 1장이어도 보인다 (기획 정의서 09: ▬ • •, 현재 사진이 긴 막대) */}
-      {card.photos.length > 0 && (
+      {/* 사진 장수 (기획 정의서 09: ▬ • •, 현재 사진이 긴 막대). 1장이면 넘길 게 없어 숨긴다 */}
+      {card.photos.length > 1 && (
         <div className="absolute top-3 inset-x-0 flex justify-center gap-1 pointer-events-none">
           {card.photos.map((_, i) => (
             <span key={i} className={`h-1.5 rounded-full transition-all ${i === photoIdx ? "w-5 bg-white" : "w-1.5 bg-white/50"}`} />

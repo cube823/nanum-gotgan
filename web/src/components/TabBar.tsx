@@ -10,7 +10,6 @@ const ICONS = {
   plus: <><circle cx="12" cy="12" r="8.5" /><path d="M12 8v8M8 12h8" /></>,
   chat: <path d="M5 5h14a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9l-4 3.5V6a1 1 0 0 1 1-1z" />,
   user: <><circle cx="12" cy="8.5" r="3.5" /><path d="M5 20c.8-3.5 3.6-5.5 7-5.5s6.2 2 7 5.5" /></>,
-  check: <path d="m5 12.5 4.5 4.5L19 7.5" />,
 };
 
 const TABS = [
@@ -51,14 +50,14 @@ function useUnread(path: string) {
   return n;
 }
 
-export function TabBar({ canApprove }: { canApprove: boolean }) {
+// 승인 탭은 없다 — 가입 즉시 verified라 대기자가 생기지 않는다 (decisions/0008). /admin/approvals는 URL로만 남긴다.
+export function TabBar() {
   const path = usePathname();
   const on = (href: string) => path === href || path.startsWith(href + "/");
   const unread = useUnread(path);
   return (
     <nav className="fixed bottom-0 inset-x-0 mx-auto max-w-md bg-white border-t border-neutral-200 flex pb-[env(safe-area-inset-bottom)]">
       {TABS.map((t) => <Tab key={t.href} {...t} active={on(t.href)} badge={t.href === "/messages" ? unread : 0} />)}
-      {canApprove && <Tab href="/admin/approvals" label="승인" icon={ICONS.check} active={on("/admin/approvals")} />}
     </nav>
   );
 }

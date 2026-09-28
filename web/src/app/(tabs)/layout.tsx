@@ -13,7 +13,7 @@ export default async function TabsLayout({ children, modal }: { children: React.
       )}
       <div className="flex-1 flex flex-col pb-16">{children}</div>
       {modal}
-      <TabBar canApprove={!!u && (u.isAdmin || (u.orgRole === "manager" && u.orgStatus === "verified"))} />
+      <TabBar />
     </>
   );
 }

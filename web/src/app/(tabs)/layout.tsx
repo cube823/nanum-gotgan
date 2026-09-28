@@ -11,7 +11,7 @@ export default async function TabsLayout({ children, modal }: { children: React.
           소속 확인 중이에요 — 확인되면 등록·신청을 할 수 있어요
         </Link>
       )}
-      <div className="flex-1 flex flex-col pb-16">{children}</div>
+      <div className="flex-1 flex flex-col pb-[calc(4rem+env(safe-area-inset-bottom))]">{children}</div>
       {modal}
       <TabBar />
     </>

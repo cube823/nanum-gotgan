@@ -5,7 +5,8 @@ const hasKakao = !!process.env.AUTH_KAKAO_ID;
 
 export default function LoginPage() {
   return (
-    <main className="flex-1 flex flex-col px-6 pt-10 pb-8">
+    // 기획 정의서 16-2: 버튼 52px, 마지막 버튼 아래 38px + 홈 인디케이터
+    <main className="flex-1 flex flex-col px-6 pt-10 pb-[calc(38px+env(safe-area-inset-bottom))]">
       <div className="px-12">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo.png" alt="나눔곳간" width={44} height={44} className="size-11" />
@@ -22,14 +23,14 @@ export default function LoginPage() {
       <div className="space-y-3 px-12">
         {hasGoogle && (
           <form action={async () => { "use server"; await signIn("google", { redirectTo: "/" }); }}>
-            <button className="btn-cta text-[15px]">
+            <button className="btn-cta h-13 text-[15px]">
               <span aria-hidden className="text-lg font-black">G</span>구글로 계속하기
             </button>
           </form>
         )}
         {hasKakao && (
           <form action={async () => { "use server"; await signIn("kakao", { redirectTo: "/" }); }}>
-            <button className="btn-kakao text-[15px]">
+            <button className="btn-kakao h-13 text-[15px]">
               <svg aria-hidden viewBox="0 0 20 18" className="size-4.5 fill-current">
                 <path d="M10 0C4.5 0 0 3.5 0 7.8c0 2.8 1.9 5.3 4.7 6.7L3.7 18l4.1-2.7c.7.1 1.4.2 2.2.2 5.5 0 10-3.5 10-7.8S15.5 0 10 0z" />
               </svg>

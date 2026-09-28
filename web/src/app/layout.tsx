@@ -9,7 +9,9 @@ export const metadata: Metadata = {
   appleWebApp: { capable: true, title: "나눔곳간", statusBarStyle: "default" },
 };
 
-export const viewport: Viewport = { width: "device-width", initialScale: 1, maximumScale: 1, themeColor: "#ffffff" };
+// viewportFit: "cover" — 이게 있어야 env(safe-area-inset-bottom)이 아이폰 홈 인디케이터 높이를 돌려준다.
+// 없으면 0이라 탭바·채팅 입력·로그인 버튼이 인디케이터에 붙는다 (특히 홈 화면에 추가한 PWA).
+export const viewport: Viewport = { width: "device-width", initialScale: 1, maximumScale: 1, themeColor: "#ffffff", viewportFit: "cover" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

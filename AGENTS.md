@@ -16,7 +16,7 @@ docs/               사람용 문서. 지도는 docs/README.md
 ```bash
 pnpm install                # 한 번. 모든 패키지
 pnpm dev | build | typecheck | lint    # web
-pnpm smoke                  # web curl 한 바퀴 139건. dev 서버 필요
+pnpm smoke                  # web curl 한 바퀴 141건. dev 서버 필요
 pnpm test                   # -r: test 스크립트 있는 패키지 전부 (지금은 ai)
 pnpm --filter @nanum/ai try photo.jpg  # 특정 패키지 스크립트
 ```

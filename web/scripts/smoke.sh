@@ -316,6 +316,8 @@ expect "없는 사용자 프로필 404" "404" "$(curl -s -o /dev/null -b "$A" -w
 expect "uuid 아닌 프로필 404"   "404" "$(curl -s -o /dev/null -b "$A" -w '%{http_code}' "$BASE/users/abc")"
 expect "GET / 미로그인 → /login" "307" "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/")"
 expect "GET /logo.png 미로그인 200 (정적 파일은 게이트 밖)" "200" "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/logo.png")"
+expect "PWA manifest 미로그인 200" "200" "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/manifest.webmanifest")"
+expect "PWA manifest standalone" "standalone" "$(curl -s "$BASE/manifest.webmanifest" | jget display)"
 
 echo
 echo "통과 $PASS · 실패 $FAIL"

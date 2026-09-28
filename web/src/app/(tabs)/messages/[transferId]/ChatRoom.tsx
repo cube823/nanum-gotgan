@@ -34,7 +34,11 @@ export function ChatRoom({ transferId, me, owner, requester, item, transferStatu
   const [err, setErr] = useState<string | null>(null);
   const [menu, setMenu] = useState(false);
   const [askUnschedule, setAskUnschedule] = useState(false);
-  const bottom = useRef<HTMLDivElement>(null);
+  const list = useRef<HTMLDivElement>(null);
+  const input = useRef<HTMLInputElement>(null);
+  // 모바일 키보드: iOS Safari는 키보드가 떠도 fixed 레이어 크기를 안 줄이고 페이지를 밀어 올린다.
+  // 그래서 화면 높이·위치를 visualViewport(키보드를 뺀 실제 보이는 영역)에 맞춘다 — 헤더는 제자리, 대화 목록만 줄어든다.
+  const [vv, setVv] = useState<{ h: number; top: number; kb: boolean } | null>(null);
   const lastAt = useRef<string | null>(null);
 
   const isOwner = me === owner.id;
@@ -58,16 +62,32 @@ export function ChatRoom({ transferId, me, owner, requester, item, transferStatu
     return () => clearInterval(id);
   }, [poll]);
 
-  useEffect(() => { bottom.current?.scrollIntoView({ block: "end" }); }, [msgs.length]);
+  useEffect(() => {
+    const v = window.visualViewport;
+    if (!v) return;
+    // kb: 키보드가 떠 있다 — 보이는 높이가 창보다 한참 작다. 그땐 홈 인디케이터가 가려져 그 여백을 뺀다
+    const on = () => setVv({ h: v.height, top: v.offsetTop, kb: window.innerHeight - v.height > 120 });
+    void Promise.resolve().then(on);
+    v.addEventListener("resize", on);
+    v.addEventListener("scroll", on);
+    return () => { v.removeEventListener("resize", on); v.removeEventListener("scroll", on); };
+  }, []);
+
+  // 맨 아래로 — 대화 목록 안에서만 스크롤한다 (scrollIntoView는 페이지까지 밀어 올린다). 키보드가 뜰 때(vv.h 변화)도.
+  useEffect(() => {
+    const el = list.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [msgs.length, vv?.h]);
 
   async function send() {
     const body = text.trim();
-    if (!body) return;
+    if (!body || busy) return;
     setBusy(true); setText("");
     const r = await fetch(`/api/transfers/${transferId}/messages`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ body }) });
     if (r.ok) { const m = await r.json(); lastAt.current = m.createdAt; setMsgs((x) => [...x, m]); }
     else { setText(body); setErr((await r.json().catch(() => ({}))).error ?? "보내지 못했어요."); }
     setBusy(false);
+    input.current?.focus();   // 보낸 뒤에도 키보드를 유지한다
   }
 
   async function act(action: "schedule" | "unschedule" | "complete") {
@@ -99,7 +119,8 @@ export function ChatRoom({ transferId, me, owner, requester, item, transferStatu
 
   return (
     // 채팅방은 탭바 없이 화면 전체 (기획 정의서 14). 탭 레이아웃 위에 덮는다.
-    <main className="fixed inset-0 z-30 mx-auto flex max-w-md flex-col bg-white">
+    <main className="fixed inset-x-0 top-0 z-30 mx-auto flex h-dvh max-w-md flex-col bg-white"
+      style={vv ? { height: vv.h, transform: `translateY(${vv.top}px)` } : undefined}>
       {/* 상단 — 상대 이름·기관, 누르면 상대 프로필 */}
       <header className="relative flex h-16 shrink-0 items-center justify-between px-2">
         <Link href="/messages" aria-label="대화 목록" className="size-10 grid place-items-center text-2xl text-neutral-900">‹</Link>
@@ -160,7 +181,7 @@ export function ChatRoom({ transferId, me, owner, requester, item, transferStatu
       </Link>
 
       {/* 대화 */}
-      <div className="flex-1 overflow-y-auto px-4 pb-4">
+      <div ref={list} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4">
         {msgs.length === 0 && <p className="py-10 text-center text-xs text-neutral-400">첫 메시지를 보내 보세요.</p>}
         {msgs.map((m, i) => {
           const prev = msgs[i - 1];
@@ -227,20 +248,21 @@ export function ChatRoom({ transferId, me, owner, requester, item, transferStatu
           </p>
         )}
         {err && <p className="mt-2 text-center text-xs text-accent">{err}</p>}
-        <div ref={bottom} />
       </div>
 
       {/* 하단 — 내 역할·이름·상태, 입력 */}
-      <div className="shrink-0 px-4 pb-[calc(12px+env(safe-area-inset-bottom))]">
+      <div className={`shrink-0 px-4 ${vv?.kb ? "pb-2" : "pb-[calc(12px+env(safe-area-inset-bottom))]"}`}>
         <p className="mb-2 text-center text-[11px] text-neutral-400">
           {isOwner ? "나눔기관" : "신청기관"} 담당자 · {(isOwner ? owner : requester).name} · {st.label}
         </p>
         <form onSubmit={(e) => { e.preventDefault(); send(); }}
           className="flex h-12 items-center gap-2 rounded-full border border-neutral-200 pl-4 pr-1.5 focus-within:border-brand">
           <input className="min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-neutral-400"
-            value={text} onChange={(e) => setText(e.target.value)} disabled={closed || busy}
+            ref={input} value={text} onChange={(e) => setText(e.target.value)} disabled={closed}
+            enterKeyHint="send"
             placeholder={closed ? "종료된 대화예요" : "메시지를 입력하세요"} aria-label="메시지" />
-          <button aria-label="보내기" disabled={closed || busy || !text.trim()}
+          {/* 누를 때 포커스를 뺏지 않는다 — 입력창에서 포커스가 빠지면 모바일 키보드가 내려간다 */}
+          <button aria-label="보내기" disabled={closed || busy || !text.trim()} onPointerDown={(e) => e.preventDefault()}
             className="size-9 shrink-0 rounded-full bg-brand text-white grid place-items-center disabled:opacity-40">
             <svg aria-hidden viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M6 11l6-6 6 6" /></svg>
           </button>

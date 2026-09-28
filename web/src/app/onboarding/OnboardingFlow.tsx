@@ -25,6 +25,7 @@ export function OnboardingFlow({
   const [step, setStep] = useState<Step>(profile.hasOrg ? 3 : profile.realName && profile.phone ? 2 : 1);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [verifying, setVerifying] = useState(false);   // 사업자번호 "인증하기" — 같은 화면의 "다음으로"와 문구를 따로 바꾼다
 
   // STEP 1
   const [realName, setRealName] = useState(profile.realName);
@@ -92,9 +93,9 @@ export function OnboardingFlow({
   }
 
   async function verifyBizNo() {
-    setBusy(true); setError(null);
+    setVerifying(true); setError(null);
     const { ok, j } = await send("/api/orgs/bizno", { bizNo, orgId: picked?.id }, "POST");
-    setBusy(false);
+    setVerifying(false);
     if (!ok) { setError(j.error ?? "다시 시도해 주세요."); return; }
     setBizOk({ matched: !!j.matched });
   }
@@ -184,7 +185,7 @@ export function OnboardingFlow({
         {err}
 
         <button disabled={busy || picks.length < MIN_PICKS} onClick={submitInterests}
-          className="btn-cta mt-8">다음으로</button>
+          className="btn-cta mt-8">{busy ? "저장 중…" : "다음으로"}</button>
       </StepShell>
     );
   }
@@ -280,15 +281,15 @@ export function OnboardingFlow({
           </p>
         ) : (
           <button type="button" onClick={verifyBizNo}
-            disabled={busy || typed.length < 2 || bizNo.replace(/\D/g, "").length !== 10}
+            disabled={verifying || busy || typed.length < 2 || bizNo.replace(/\D/g, "").length !== 10}
             className="btn mt-5 h-13 w-full rounded-2xl bg-brand/10 text-brand">
-            인증하기
+            {verifying ? "확인 중…" : "인증하기"}
           </button>
         )}
 
         <button disabled={busy || !bizOk || (!picked && address.trim().length < 5)}
           onClick={() => submitOrg(picked ? { orgId: picked.id, bizNo } : { name: typed, orgType: "모름", bizNo, address: address.trim() })}
-          className="btn-cta mt-3">다음으로</button>
+          className="btn-cta mt-3">{busy ? "저장 중…" : "다음으로"}</button>
       </StepShell>
     );
   }
@@ -311,7 +312,7 @@ export function OnboardingFlow({
       {err}
 
       <button disabled={busy || realName.trim().length < 2 || !phoneOk}
-        onClick={submitProfile} className="btn-cta mt-8">다음으로</button>
+        onClick={submitProfile} className="btn-cta mt-8">{busy ? "저장 중…" : "다음으로"}</button>
     </StepShell>
   );
 }

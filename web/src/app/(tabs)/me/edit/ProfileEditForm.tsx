@@ -9,32 +9,40 @@ export function ProfileEditForm({ name: initialName, image: initialImage, orgNam
   const router = useRouter();
   const [name, setName] = useState(initialName);
   const [image, setImage] = useState(initialImage);
-  const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const busy = uploading || saving;
   const [err, setErr] = useState<string | null>(null);
 
   async function upload(file: File) {
-    setBusy(true); setErr(null);
+    setUploading(true); setErr(null);
     const fd = new FormData(); fd.append("file", file);
     const r = await fetch("/api/uploads", { method: "POST", body: fd });
     const j = await r.json().catch(() => ({}));
     if (r.ok) setImage(j.url); else setErr(j.error ?? "사진을 올리지 못했어요.");
-    setBusy(false);
+    setUploading(false);
   }
 
   async function save() {
-    setBusy(true); setErr(null);
+    setSaving(true); setErr(null);
     const r = await fetch("/api/me/profile", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ realName: name, profileImage: image }) });
-    if (!r.ok) { setErr((await r.json().catch(() => ({}))).error ?? "저장하지 못했어요."); setBusy(false); return; }
+    if (!r.ok) { setErr((await r.json().catch(() => ({}))).error ?? "저장하지 못했어요."); setSaving(false); return; }
     router.push("/me");
     router.refresh();
   }
 
   return (
     <SubPage title="프로필 수정"
-      action={<button onClick={save} disabled={busy || name.trim().length < 2} className="px-3 text-base font-bold text-brand disabled:text-neutral-300">완료</button>}>
+      action={<button onClick={save} disabled={busy || name.trim().length < 2} className="px-3 text-base font-bold text-brand disabled:text-neutral-300">{saving ? "저장 중…" : "완료"}</button>}>
       <div className="px-5 pt-8">
         <label className="relative mx-auto block size-24 cursor-pointer">
           <Avatar src={image} className="size-24 border-4 border-neutral-100" />
+          {/* 올리는 동안 사진 위 덮개 + 스피너 (docs/design/LOADING-STATES.md D) */}
+          {uploading && (
+            <span role="status" aria-label="사진 올리는 중" className="absolute inset-0 grid place-items-center rounded-full bg-black/40">
+              <span className="size-7 animate-spin rounded-full border-[3px] border-white/40 border-t-white" />
+            </span>
+          )}
           <span aria-hidden className="absolute bottom-0 right-0 grid size-8 place-items-center rounded-full border border-neutral-200 bg-white text-sm">📷</span>
           <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" aria-label="프로필 사진 바꾸기" disabled={busy}
             onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void upload(f); }} />

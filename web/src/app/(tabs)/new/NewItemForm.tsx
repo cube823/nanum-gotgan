@@ -361,7 +361,7 @@ export function NewItemForm({ categories, org, userId }: { categories: Category[
       </div>
 
       <div className="shrink-0 px-5 pt-3 pb-[calc(16px+env(safe-area-inset-bottom))]">
-        <button onClick={submit} disabled={!canSubmit || busy} className="btn-cta">작성완료</button>
+        <button onClick={submit} disabled={!canSubmit || busy} className="btn-cta">{busy ? "올리는 중…" : "작성완료"}</button>
       </div>
 
       {picking && (

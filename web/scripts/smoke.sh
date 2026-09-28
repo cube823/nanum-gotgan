@@ -52,6 +52,12 @@ first()  { python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0]['id']
 dist()   { python3 -c "import sys,json; print(next((i.get('distanceKm') for i in json.load(sys.stdin) if i['id']=='$1'), 'missing'))"; }
 marked() { python3 -c "import sys,json; print(next((i.get('bookmarked') for i in json.load(sys.stdin) if i['id']=='$1'), None))"; }
 
+# 없는 자원 = 404 화면. loading.tsx가 있는 라우트는 스트리밍이 먼저 시작돼 HTTP 상태가 200으로 나가고
+# 본문에 Next의 404 화면 + noindex가 온다 (next/dist/docs … loading.md "Status Codes"). 둘 다 404로 본다.
+nf() { # nf <jar> <path>  → "404" 또는 실제 상태
+  local out code; out=$(curl -s -b "$1" -w '\n%{http_code}' "$BASE$2"); code=$(echo "$out" | tail -n1)
+  if [ "$code" = 404 ] || { [ "$code" = 200 ] && echo "$out" | grep -q 'name="robots" content="noindex"' && echo "$out" | grep -q 'could not be found'; }; then echo 404; else echo "$code"; fi
+}
 A=$J/a B=$J/b ADM=$J/adm
 SUF=$RANDOM
 
@@ -293,7 +299,7 @@ for p in /swipe /items "/items/$ITEM" /new /messages "/messages/$T" /me /me/book
 done
 expect "GET /admin/approvals (운영자)" "200" "$(curl -s -o /dev/null -b "$ADM" -w '%{http_code}' "$BASE/admin/approvals")"
 expect "GET /admin/approvals (B, manager verified) 200" "200" "$(curl -s -o /dev/null -b "$B" -w '%{http_code}' "$BASE/admin/approvals")"
-expect "없는 내 정보 목록 404" "404" "$(curl -s -o /dev/null -b "$A" -w '%{http_code}' "$BASE/me/nope")"
+expect "없는 내 정보 목록 404" "404" "$(nf "$A" /me/nope)"
 
 echo "9b. 내 정보 목록 — 사람 기준 / 기관 기준 (기획 정의서 106-294~296)"
 expect "B 수령한 물품에 완료 물품"       "yes" "$(see "$B" /me/received "크라프트 종이봉투")"
@@ -312,8 +318,8 @@ expect "바뀐 이름"             "기관A 새이름" "$(api "$A" GET /api/me |
 expect "전화번호는 그대로"     "01012345678" "$(api "$A" GET /api/me | body | jget phone)"
 expect "내 정보에 바뀐 이름"   "yes" "$(see "$A" /me "기관A 새이름")"
 
-expect "없는 사용자 프로필 404" "404" "$(curl -s -o /dev/null -b "$A" -w '%{http_code}' "$BASE/users/00000000-0000-0000-0000-000000000000")"
-expect "uuid 아닌 프로필 404"   "404" "$(curl -s -o /dev/null -b "$A" -w '%{http_code}' "$BASE/users/abc")"
+expect "없는 사용자 프로필 404" "404" "$(nf "$A" /users/00000000-0000-0000-0000-000000000000)"
+expect "uuid 아닌 프로필 404"   "404" "$(nf "$A" /users/abc)"
 expect "GET / 미로그인 → /login" "307" "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/")"
 expect "GET /logo.png 미로그인 200 (정적 파일은 게이트 밖)" "200" "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/logo.png")"
 expect "PWA manifest 미로그인 200" "200" "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/manifest.webmanifest")"

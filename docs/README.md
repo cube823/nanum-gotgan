@@ -10,7 +10,7 @@
 | [decisions/](decisions/) | 왜 그렇게 정했는지. 뒤집을 때도 여기에 새 번호로 |
 | [guides/adding-a-feature.md](guides/adding-a-feature.md) | 기능을 넣을 때 순서와 체크리스트 |
 | [guides/deploy.md](guides/deploy.md) | Vercel + Neon + Blob + nanumgotgan.com — 순서와 OAuth URI 갱신 |
-| [design/](design/) | 원본 설계 — `MVP.md`(범위·플로우), `DB-SCHEMA.md`(스키마·상태표), `AI-LOOP-DESIGN.md` |
+| [design/](design/) | 원본 설계 — `MVP.md`(범위·플로우), `DB-SCHEMA.md`(스키마·상태표), `AI-LOOP-DESIGN.md`, `LOADING-STATES.md`(기다리는 순간마다 무엇을 보일지) |
 
 ## 규칙
 

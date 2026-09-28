@@ -109,7 +109,16 @@ export default function SwipePage() {
       </header>
 
       <div className="flex-1 px-3.5 pb-3 flex flex-col">
-        {cards === null && <div className="flex-1 grid place-items-center text-neutral-400">불러오는 중…</div>}
+        {cards === null && (
+          // 카드 모양 스켈레톤 — 사진 자리 + 아래 칩·제목·기관 줄 (docs/design/LOADING-STATES.md B)
+          <div aria-busy="true" aria-label="물품 불러오는 중" className="relative flex-1 min-h-[440px] overflow-hidden rounded-3xl bg-neutral-100 animate-pulse">
+            <div className="absolute inset-x-5 bottom-28 space-y-3">
+              <div className="flex gap-2"><span className="h-6 w-16 rounded-full bg-neutral-200" /><span className="h-6 w-14 rounded-full bg-neutral-200" /></div>
+              <span className="block h-7 w-2/3 rounded-lg bg-neutral-200" />
+              <span className="block h-4 w-1/3 rounded-lg bg-neutral-200" />
+            </div>
+          </div>
+        )}
 
         {cards && !card && (
           <div className="flex-1 rounded-2xl bg-neutral-50 grid place-items-center text-center p-8">

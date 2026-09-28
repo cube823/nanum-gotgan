@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TRANSFER_STATUS, ampm } from "@/lib/labels";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { Sk } from "@/components/Skeleton";
 
 type Msg = { id: string; senderId: string; body: string; createdAt: string };
 type Person = { id: string; name: string; org: string };
@@ -29,11 +30,16 @@ function Avatar() {
 export function ChatRoom({ transferId, me, owner, requester, item, transferStatus, scheduledAt }: Props) {
   const router = useRouter();
   const [msgs, setMsgs] = useState<Msg[]>([]);
+  const [loaded, setLoaded] = useState(false);   // 첫 조회 전엔 "첫 메시지를 보내 보세요"를 띄우지 않는다
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [menu, setMenu] = useState(false);
   const [askUnschedule, setAskUnschedule] = useState(false);
+  // 확정·완료·취소 진행 중 — 요청부터 새 상태가 화면에 올 때(refresh)까지. 그동안 버튼 문구가 바뀌고 두 번 못 누른다
+  const [acting, setActing] = useState<"schedule" | "unschedule" | "complete" | null>(null);
+  // setActing(null)을 refresh와 같은 transition에 넣어, 새 상태가 그려질 때 같이 풀린다
+  const [, startRefresh] = useTransition();
   const list = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
   // 모바일 키보드: iOS Safari는 키보드가 떠도 fixed 레이어 크기를 안 줄이고 페이지를 밀어 올린다.
@@ -47,8 +53,9 @@ export function ChatRoom({ transferId, me, owner, requester, item, transferStatu
 
   const poll = useCallback(async () => {
     const q = lastAt.current ? `?after=${encodeURIComponent(lastAt.current)}` : "";
-    const r = await fetch(`/api/transfers/${transferId}/messages${q}`);
-    if (!r.ok) return;
+    const r = await fetch(`/api/transfers/${transferId}/messages${q}`).catch(() => null);
+    setLoaded(true);
+    if (!r?.ok) return;
     const rows: Msg[] = await r.json();
     if (rows.length) {
       lastAt.current = rows[rows.length - 1].createdAt;
@@ -57,7 +64,7 @@ export function ChatRoom({ transferId, me, owner, requester, item, transferStatu
   }, [transferId]);
 
   useEffect(() => {
-    poll();
+    void Promise.resolve().then(poll);
     const id = setInterval(poll, 5000);
     return () => clearInterval(id);
   }, [poll]);
@@ -92,11 +99,11 @@ export function ChatRoom({ transferId, me, owner, requester, item, transferStatu
 
   async function act(action: "schedule" | "unschedule" | "complete") {
     // 확정·완료는 카드 자체가 "~하시겠습니까? [확인]"이라 한 번 더 묻지 않는다. 되돌리기(예약 취소)만 ConfirmDialog로 묻는다.
-    setMenu(false); setAskUnschedule(false);
-    setErr(null);
+    if (acting) return;
+    setMenu(false); setActing(action); setErr(null);
     const r = await fetch(`/api/transfers/${transferId}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ action }) });
-    if (!r.ok) { setErr((await r.json()).error); return; }
-    router.refresh();
+    if (!r.ok) { setErr((await r.json().catch(() => ({}))).error ?? "처리하지 못했어요."); setActing(null); setAskUnschedule(false); return; }
+    startRefresh(() => { router.refresh(); setActing(null); setAskUnschedule(false); });
   }
 
   const closed = transferStatus === "cancelled" || transferStatus === "completed";
@@ -165,7 +172,7 @@ export function ChatRoom({ transferId, me, owner, requester, item, transferStatu
 
       <ConfirmDialog open={askUnschedule} danger title="예약을 취소할까요?"
         desc="다시 채팅 중으로 돌아가고, 물품도 다른 기관이 신청할 수 있게 열려요."
-        confirmLabel="예약 취소" onConfirm={() => act("unschedule")} onCancel={() => setAskUnschedule(false)} />
+        busy={acting === "unschedule"} confirmLabel="예약 취소" onConfirm={() => act("unschedule")} onCancel={() => setAskUnschedule(false)} />
 
       {/* 물품 카드 — 물품명 + 신청 상태 */}
       <Link href={`/items/${item.id}`} className="mx-4 flex shrink-0 items-center gap-3 rounded-2xl bg-brand/5 px-3 py-3">
@@ -182,7 +189,14 @@ export function ChatRoom({ transferId, me, owner, requester, item, transferStatu
 
       {/* 대화 */}
       <div ref={list} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4">
-        {msgs.length === 0 && <p className="py-10 text-center text-xs text-neutral-400">첫 메시지를 보내 보세요.</p>}
+        {!loaded && (
+          <div aria-busy="true" aria-label="대화 불러오는 중" className="space-y-5 pt-6">
+            <Sk className="h-12 w-3/5 rounded-2xl" />
+            <Sk className="ml-auto h-12 w-1/2 rounded-2xl" />
+            <Sk className="h-16 w-2/3 rounded-2xl" />
+          </div>
+        )}
+        {loaded && msgs.length === 0 && <p className="py-10 text-center text-xs text-neutral-400">첫 메시지를 보내 보세요.</p>}
         {msgs.map((m, i) => {
           const prev = msgs[i - 1];
           const eventHere = i === eventAt;
@@ -226,7 +240,7 @@ export function ChatRoom({ transferId, me, owner, requester, item, transferStatu
               <span className="block text-sm font-bold">예약을 확정하시겠습니까?</span>
               <span className="mt-0.5 block truncate text-xs text-neutral-500">{requester.org} · {requester.name}님께 나눠요</span>
             </span>
-            <button onClick={() => act("schedule")} className="btn-brand shrink-0 px-4 py-2 text-sm">확인</button>
+            <button onClick={() => act("schedule")} disabled={!!acting} className="btn-brand shrink-0 px-4 py-2 text-sm disabled:opacity-70">{acting === "schedule" ? "확정 중…" : "확인"}</button>
           </div>
         ) : isOwner && transferStatus === "scheduled" ? (
           // 기획 정의서 338-52 — 예약 확정 이후 등록자에게 나눔 완료 확인
@@ -235,7 +249,7 @@ export function ChatRoom({ transferId, me, owner, requester, item, transferStatu
               <span className="block text-sm font-bold">나눔 완료하셨습니까?</span>
               <span className="mt-0.5 block truncate text-xs text-neutral-500">수령 완료 여부를 확인해 주세요</span>
             </span>
-            <button onClick={() => act("complete")} className="btn-brand shrink-0 px-4 py-2 text-sm">확인</button>
+            <button onClick={() => act("complete")} disabled={!!acting} className="btn-brand shrink-0 px-4 py-2 text-sm disabled:opacity-70">{acting === "complete" ? "처리 중…" : "확인"}</button>
           </div>
         ) : (
           <p className="mt-5 flex items-center gap-2 rounded-2xl bg-neutral-100/80 px-4 py-3.5 text-sm text-neutral-700">

@@ -25,6 +25,7 @@ git config --local user.email cube823@gmail.com   # Vercel 로그인 계정과 �
 1. https://vercel.com/new → GitHub `nanum-gotgan` Import
 2. **Root Directory: `web`** ← 모노레포라 필수. Vercel이 루트 `pnpm-workspace.yaml`을 보고 설치는 루트에서, 빌드는 `web`에서 한다. 안 바꾸면 "Next.js를 못 찾음"
 3. Framework: Next.js (자동). Build/Install 명령은 건드리지 않는다
+   함수 지역은 `web/vercel.json`의 `"regions": ["sin1"]`(싱가포르)로 고정한다. Neon이 `ap-southeast-1`이라 같은 곳에 둔다 — Neon엔 서울 지역이 없다. 기본값(`iad1`, 미국)이면 요청·DB 조회마다 태평양을 건넌다 (2026-09-28 측정: 로그인 액션 0.33~0.41초).
 4. Environment Variables — 지금 넣을 것:
 
    | 이름 | 값 |

@@ -6,15 +6,19 @@ import type { Category } from "@/lib/types";
 import { CONDITION_LABEL, CONDITIONS } from "@/lib/labels";
 import { KakaoMap } from "@/components/KakaoMap";
 import { PlacePicker } from "@/components/PlacePicker";
+import { CameraCapture } from "@/components/CameraCapture";
+import { shrinkImage, limit, UPLOAD_LIMIT } from "@/lib/image";
 
 /** 등록하기 — 기획 정의서 58-156·157(사진 선택) + 82-25·26(게시물 내용 등록), decisions/0010.
  *
  *  웹이라 사진보관함 권한 팝업·전체 목록은 없다. 폰 사진 선택기로 가져온 사진을 우리 그리드에 모으고,
  *  누르는 순서대로 번호를 매긴다(1번 = 대표). 카메라도 폰 기본 카메라(capture). 편집은 범위 밖.
- *  업로드는 선택한 사진만, "n장 사진 등록하기"를 누를 때 — 그래서 입력 화면에선 사진이 전부 URL을 갖는다. */
+ *  업로드는 고르는 즉시 뒤에서(동시 3장), 폰에서 긴 변 1600px로 줄여서 — Vercel 4.5MB 한도·이동통신 속도 (lib/image.ts).
+ *  "n장 사진 등록하기"는 선택한 사진이 전부 올라간 뒤에 넘어간다 — 그래서 입력 화면에선 사진이 전부 URL을 갖는다.
+ *  촬영은 우리 카메라 화면(70-26, components/CameraCapture) — 못 열면 폰 기본 카메라로. */
 const MAX = 10;
 
-type Pick = { id: string; file?: File; preview: string; url?: string };   // 임시저장에서 복원한 사진은 file 없이 url만
+type Pick = { id: string; file?: File; preview: string; url?: string; status?: "uploading" | "error"; error?: string };   // 임시저장에서 복원한 사진은 file 없이 url만
 type Org = { name: string; address: string | null; lat: number | null; lng: number | null };
 type Place = { name: string; address: string | null; lat: number | null; lng: number | null };
 
@@ -36,7 +40,8 @@ export function NewItemForm({ categories, org, userId }: { categories: Category[
   const [step, setStep] = useState<"photos" | "info">("photos");
   const [pool, setPool] = useState<Pick[]>([]);          // 가져온 사진, 최근 것이 앞
   const [order, setOrder] = useState<string[]>([]);      // 선택 순서 (Pick.id). 1번이 대표
-  const [uploading, setUploading] = useState<string | null>(null);
+  const [camera, setCamera] = useState(false);          // 우리 카메라 화면 (70-25 안내 → 70-26)
+  const nativeCamera = useRef<HTMLInputElement>(null);  // 카메라를 못 열 때 폰 기본 카메라
   const [err, setErr] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -69,7 +74,7 @@ export function NewItemForm({ categories, org, userId }: { categories: Category[
   const picked = order.map((id) => pool.find((p) => p.id === id)!).filter(Boolean);
 
   /** 새로 가져온 사진은 자리가 있는 만큼 바로 선택한다 (가져온 순서대로 번호). */
-  function add(list: FileList | null) {
+  function add(list: FileList | File[] | null) {
     if (!list?.length) return;
     setErr(null);
     const fresh = Array.from(list).filter((f) => f.type.startsWith("image/"))
@@ -78,10 +83,34 @@ export function NewItemForm({ categories, org, userId }: { categories: Category[
     setPool((p) => [...fresh.slice().reverse(), ...p]);
     setOrder((o) => [...o, ...fresh.map((x) => x.id)].slice(0, MAX));
     if (order.length + fresh.length > MAX) setErr(`최대 ${MAX}장까지 고를 수 있어요.`);
+    // 선택된 것만 바로 올린다 (자리가 없어 선택 안 된 건 고를 때 올린다)
+    void limit(fresh.slice(0, Math.max(0, MAX - order.length)), 3, uploadOne);
+  }
+
+  const patch = (id: string, v: Partial<Pick>) => setPool((ps) => ps.map((x) => (x.id === id ? { ...x, ...v } : x)));
+
+  /** 한 장: 폰에서 줄이고 → 올리고 → url. 실패하면 그 사진에 표시하고, 누르면 다시 시도한다. */
+  async function uploadOne(p: Pick) {
+    if (p.url || !p.file) return;
+    patch(p.id, { status: "uploading", error: undefined });
+    try {
+      const blob = await shrinkImage(p.file);
+      if (blob.size > UPLOAD_LIMIT) { patch(p.id, { status: "error", error: "사진이 너무 커요. 다른 사진을 골라 주세요." }); return; }
+      const fd = new FormData(); fd.append("file", blob, "photo.jpg");
+      const r = await fetch("/api/uploads", { method: "POST", body: fd });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) { patch(p.id, { status: "error", error: j.error ?? "사진을 올리지 못했어요." }); return; }
+      patch(p.id, { url: j.url, status: undefined });
+    } catch {
+      patch(p.id, { status: "error", error: "연결이 끊겼어요. 눌러서 다시 올려 주세요." });
+    }
   }
 
   function toggle(id: string) {
     setErr(null);
+    const p = pool.find((x) => x.id === id);
+    if (p?.status === "error") { void uploadOne(p); return; }                 // 실패한 사진은 누르면 다시 올린다
+    if (p && !order.includes(id) && order.length < MAX) void uploadOne(p);   // 새로 고른 사진은 바로 올린다
     setOrder((o) => {
       if (o.includes(id)) return o.filter((x) => x !== id);
       if (o.length >= MAX) { setErr(`최대 ${MAX}장까지 고를 수 있어요.`); return o; }
@@ -89,21 +118,11 @@ export function NewItemForm({ categories, org, userId }: { categories: Category[
     });
   }
 
-  /** 선택한 사진만 올린다. 이미 올린 건(url 있음) 건너뛴다 — 입력 화면에서 돌아왔다 다시 와도 두 번 안 올린다. */
-  async function upload() {
-    setErr(null);
-    for (const [i, p] of picked.entries()) {
-      if (p.url || !p.file) continue;
-      setUploading(`${i + 1}/${picked.length}`);
-      const fd = new FormData(); fd.append("file", p.file);
-      const r = await fetch("/api/uploads", { method: "POST", body: fd });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok) { setErr(j.error ?? "사진을 올리지 못했어요."); setUploading(null); return; }
-      setPool((ps) => ps.map((x) => (x.id === p.id ? { ...x, url: j.url } : x)));
-    }
-    setUploading(null);
-    setStep("info");
-  }
+  // "n장 사진 등록하기" — 선택한 사진이 다 올라가면 입력 화면으로
+  const pendingN = picked.filter((p) => p.status === "uploading").length;
+  const failedN = picked.filter((p) => p.status === "error").length;
+  const doneN = picked.filter((p) => p.url).length;
+  const photosReady = picked.length > 0 && doneN === picked.length;
 
   /** 사진 줄 끌어서 순서 바꾸기 — 손가락(포인터)이 지나가는 사진 자리로 옮긴다. HTML5 드래그는 폰에서 안 돼서 포인터로. */
   function onDragMove(e: React.PointerEvent) {
@@ -156,14 +175,14 @@ export function NewItemForm({ categories, org, userId }: { categories: Category[
 
         <div className="flex-1 overflow-y-auto">
           <div className="grid grid-cols-3 gap-0.5">
-            <label className="aspect-square cursor-pointer bg-neutral-100 grid place-items-center text-neutral-600">
+            <button type="button" onClick={() => setCamera(true)} className="aspect-square bg-neutral-100 grid place-items-center text-neutral-600">
               <span className="flex flex-col items-center gap-1 text-xs">
                 <svg aria-hidden viewBox="0 0 24 24" className="size-7" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></svg>
                 촬영
               </span>
-              {/* 폰 기본 카메라 — 플래시·0.5x·전후면은 폰이 준다 */}
-              <input type="file" accept="image/*" capture="environment" hidden onChange={(e) => { add(e.target.files); e.target.value = ""; }} />
-            </label>
+            </button>
+            {/* 우리 카메라를 못 열 때(권한 거부·인앱 브라우저) 폰 기본 카메라 */}
+            <input ref={nativeCamera} type="file" accept="image/*" capture="environment" hidden onChange={(e) => { add(e.target.files); e.target.value = ""; }} />
             <label className="aspect-square cursor-pointer bg-neutral-100 grid place-items-center text-neutral-600">
               <span className="flex flex-col items-center gap-1 text-xs">
                 <svg aria-hidden viewBox="0 0 24 24" className="size-7" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinejoin="round"><rect x="4" y="4" width="16" height="16" rx="2.5" /><circle cx="9" cy="9.5" r="1.6" /><path d="m5 17 4.5-4.5 3 3 2.5-2.5L19 17" /></svg>
@@ -175,10 +194,21 @@ export function NewItemForm({ categories, org, userId }: { categories: Category[
               const n = order.indexOf(p.id) + 1;
               return (
                 <button key={p.id} type="button" onClick={() => toggle(p.id)} aria-pressed={n > 0}
-                  aria-label={n > 0 ? `${n}번째로 선택됨` : "선택"}
-                  className={`relative aspect-square overflow-hidden ${n > 0 ? "ring-2 ring-inset ring-brand" : ""}`}>
+                  aria-label={p.status === "error" ? `${p.error} 다시 올리기` : n > 0 ? `${n}번째로 선택됨` : "선택"}
+                  className={`relative aspect-square overflow-hidden ${n > 0 ? "ring-[3px] ring-inset ring-brand" : ""}`}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={p.preview} alt="" className="size-full object-cover" />
+                  {n > 0 && p.status === "uploading" && (
+                    <span aria-label="올리는 중" className="absolute inset-0 grid place-items-center bg-black/30">
+                      <span className="size-6 animate-spin rounded-full border-[3px] border-white/40 border-t-white" />
+                    </span>
+                  )}
+                  {p.status === "error" && (
+                    <span className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/55 text-[11px] font-bold text-white">
+                      <svg aria-hidden viewBox="0 0 24 24" className="size-6" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5" /></svg>
+                      다시 올리기
+                    </span>
+                  )}
                   <span className={`absolute right-1.5 top-1.5 size-6 rounded-full grid place-items-center text-xs font-bold ${
                     n > 0 ? "bg-brand text-white" : "border-2 border-white bg-black/15"}`}>
                     {n > 0 ? n : ""}
@@ -192,14 +222,25 @@ export function NewItemForm({ categories, org, userId }: { categories: Category[
               앨범에서 사진을 고르거나 촬영해 주세요.<br />최대 {MAX}장, 먼저 고른 사진이 대표 사진이 돼요.
             </p>
           )}
-          {err && <p className="px-4 pt-3 text-center text-sm text-accent">{err}</p>}
+          {(err || (failedN > 0 && picked.find((p) => p.status === "error")?.error)) && (
+            <p className="px-4 pt-3 text-center text-sm text-accent">{err ?? picked.find((p) => p.status === "error")?.error}</p>
+          )}
         </div>
 
         <div className="shrink-0 px-5 pt-3 pb-[calc(16px+env(safe-area-inset-bottom))]">
-          <button onClick={upload} disabled={order.length === 0 || !!uploading} className="btn-cta">
-            {uploading ? `올리는 중 ${uploading}` : order.length ? `${order.length}장 사진 등록하기` : "사진 등록하기"}
+          <button onClick={() => setStep("info")} disabled={!photosReady} className="btn-cta">
+            {pendingN > 0 ? `올리는 중 ${doneN}/${picked.length}`
+              : failedN > 0 ? "실패한 사진을 눌러 다시 올려 주세요"
+              : order.length ? `${order.length}장 사진 등록하기` : "사진 등록하기"}
           </button>
         </div>
+
+        {camera && (
+          <CameraCapture
+            onShot={(file) => add([file])}
+            onClose={() => setCamera(false)}
+            onFallback={() => { setCamera(false); nativeCamera.current?.click(); }} />
+        )}
       </main>
     );
   }

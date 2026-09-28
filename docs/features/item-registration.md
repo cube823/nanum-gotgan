@@ -24,6 +24,7 @@
 ## 규칙
 
 - 사진 1~10장. 순서는 `item_photos.sort_order`. URL은 `/api/uploads`가 준 것만 (`isStoredImage`, `lib/storage.ts`) — 빈 문자열·외부 주소 400.
+- 업로드는 고르는 즉시 뒤에서, 폰에서 1600px로 줄여서(`lib/image.ts`, Vercel 4.5MB 한도). "n장 사진 등록하기"는 선택한 사진이 다 올라가야 눌린다. 촬영은 `components/CameraCapture.tsx`(decisions/0010 보강).
 - `org_id`·`created_by`는 서버가 세션에서 넣는다. 클라이언트가 못 정한다. `status`도 못 정한다.
 - 법적 필드 3개는 사람이 입력. 🔴이 아니면 접혀 있다(선택).
 - **상태는 DB `상/중/하`, 화면은 `새것/거의 새것/사용감 있음`.** 값과 표시가 다르다 —

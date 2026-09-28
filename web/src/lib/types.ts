@@ -69,6 +69,5 @@ export type ItemCard = Item & {
   bookmarkCount?: number;
   chatCount?: number;      // 취소 안 된 나눔 요청 = 열린 채팅방 수
   orgAddress?: string | null;
-  distanceKm?: number | null;
-  seen?: boolean;           // 스와이프 피드: 이미 넘긴 적 있는 물품 (안 본 것이 다 떨어진 뒤 다시 도는 카드)   // 물품 기관 ↔ 내 기관 직선거리. 좌표 없으면 null
+  distanceKm?: number | null;   // 물품 기관 ↔ 내 기관 직선거리. 좌표 없으면 null
 };

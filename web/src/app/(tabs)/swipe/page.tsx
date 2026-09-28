@@ -196,8 +196,6 @@ function CardFace({ card, photoIdx, children }: { card: ItemCard; photoIdx: numb
               {card.distanceKm != null && <> · {card.distanceKm}km</>}
             </span>
           )}
-          {/* 새 물품을 다 본 뒤 다시 도는 카드 */}
-          {card.seen && <span className="rounded-full bg-white/85 px-2.5 py-1 text-xs font-bold text-neutral-700 backdrop-blur">다시 보는 물품</span>}
         </span>
         <span className="flex items-center gap-2.5 rounded-full bg-black/45 px-3 py-1.5 backdrop-blur">
           <span className="flex items-center gap-1" aria-label={`북마크 ${card.bookmarkCount ?? 0}`}>

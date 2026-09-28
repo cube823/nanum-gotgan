@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatBizNo, formatPhone } from "@/lib/labels";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import type { Category } from "@/lib/types";
@@ -27,7 +28,7 @@ export function OnboardingFlow({
 
   // STEP 1
   const [realName, setRealName] = useState(profile.realName);
-  const [phone, setPhone] = useState(profile.phone);
+  const [phone, setPhone] = useState(formatPhone(profile.phone));
 
   // STEP 2 — 목록에서 고르든(picked) 새로 적든, 사업자번호 "인증하기"(bizOk)를 통과해야 넘어간다
   const [q, setQ] = useState("");
@@ -256,7 +257,8 @@ export function OnboardingFlow({
 
         <label htmlFor="bizno" className={label}>사업자등록번호 (또는 고유번호)</label>
         <input id="bizno" className="field" value={bizNo} inputMode="numeric" placeholder="000-00-00000"
-          onChange={(e) => { setBizNo(e.target.value); setBizOk(null); setError(null); }} />
+          maxLength={12} autoComplete="off"
+          onChange={(e) => { setBizNo(formatBizNo(e.target.value)); setBizOk(null); setError(null); }} />
 
         {!picked && (
           <>
@@ -303,7 +305,8 @@ export function OnboardingFlow({
 
       <label htmlFor="phone" className={label}>전화번호</label>
       <input id="phone" className="field" value={phone} inputMode="tel" placeholder="010-0000-0000"
-        onChange={(e) => setPhone(e.target.value)} />
+        maxLength={13} autoComplete="tel"
+        onChange={(e) => setPhone(formatPhone(e.target.value))} />
 
       {err}
 

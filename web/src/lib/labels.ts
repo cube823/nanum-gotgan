@@ -53,6 +53,24 @@ export function district(address?: string | null) {
   return address?.match(/(\S+구)(?=\s)/)?.[1] ?? null;
 }
 
+/** 입력 중 자동 하이픈 — 휴대폰 010-1234-5678 (10자리면 011-123-4567). 숫자만 남기고 11자리까지.
+ *  하이픈은 뒤에 숫자가 올 때만 붙인다 — 지울 때 하이픈에 걸리지 않는다. 서버는 숫자만 쓴다 (api/me/profile). */
+export function formatPhone(raw: string): string {
+  const d = raw.replace(/\D/g, "").slice(0, 11);
+  if (d.length < 4) return d;
+  if (d.length < 8) return `${d.slice(0, 3)}-${d.slice(3)}`;
+  if (d.length === 10) return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`;
+  return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`;
+}
+
+/** 사업자등록번호 000-00-00000. 숫자 10자리까지. 서버는 normalizeBizNo로 숫자만 쓴다. */
+export function formatBizNo(raw: string): string {
+  const d = raw.replace(/\D/g, "").slice(0, 10);
+  if (d.length < 4) return d;
+  if (d.length < 6) return `${d.slice(0, 3)}-${d.slice(3)}`;
+  return `${d.slice(0, 3)}-${d.slice(3, 5)}-${d.slice(5)}`;
+}
+
 /** 2026.09.27 */
 export function ymd(d: Date | string): string {
   const x = new Date(d);

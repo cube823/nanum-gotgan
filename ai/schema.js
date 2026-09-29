@@ -4,13 +4,13 @@ import { z } from "zod";
 export const CATEGORIES = {
   stationery:  { label: "문구·사무용품",      risk: "green"  },
   packaging:   { label: "포장·박스류",        risk: "green"  },
-  craft:       { label: "공예 재료",          risk: "green"  },
+  craft:       { label: "공예·만들기 재료",   risk: "green"  },
   disposable:  { label: "일회용품·위생용품",  risk: "green"  },
-  printed:     { label: "폐홍보물·인쇄물",    risk: "green"  },
-  banner:      { label: "폐현수막·배너",      risk: "green"  },
   event:       { label: "행사·파티용품",      risk: "yellow" },
   interior:    { label: "인테리어·소품",      risk: "yellow" },
-  electronics: { label: "전기·소형비품",      risk: "red"    },
+  printed:     { label: "폐홍보물·인쇄물",    risk: "green"  },
+  banner:      { label: "폐현수막·배너",      risk: "green"  },
+  // electronics(전기·소형비품, red)는 뺐다 — decisions/0011. guard의 red 분기는 코드만 남는다.
   etc:         { label: "기타",               risk: "yellow" },
 };
 

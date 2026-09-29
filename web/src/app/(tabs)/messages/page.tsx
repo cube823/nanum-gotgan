@@ -46,6 +46,15 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
     WHERE ${scope}
     ORDER BY last_at DESC`;
 
+  // 등록한 물품 탭: 아직 대화가 없는 내 게시물도 보인다 (QA 1차 — 올린 직후 여기서 찾는다). 누르면 상세 → 게시물 수정
+  const solo = tab === "mine" ? await sql<{ id: string; name: string; thumb: string | null; createdAt: Date }[]>`
+    SELECT i.id, i.name, i.created_at,
+      (SELECT url FROM item_photos WHERE item_id = i.id ORDER BY sort_order LIMIT 1) AS thumb
+    FROM items i
+    WHERE i.created_by = ${u.id} AND i.status IN ('open', 'reserved')
+      AND NOT EXISTS (SELECT 1 FROM transfers t WHERE t.item_id = i.id)
+    ORDER BY i.created_at DESC` : [];
+
   const empty = EMPTY[tab];
 
   return (
@@ -63,7 +72,7 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
         ))}
       </nav>
 
-      {rows.length === 0 ? (
+      {rows.length === 0 && solo.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center pb-16 text-center">
           <span aria-hidden className="grid size-24 place-items-center rounded-full bg-brand/10 text-5xl">{empty.icon}</span>
           <p className="mt-7 text-lg font-bold">{empty.title}</p>
@@ -73,6 +82,26 @@ export default async function MessagesPage({ searchParams }: { searchParams: Pro
       ) : (
         <>
           <ul className="divide-y divide-neutral-100">
+            {solo.map((it) => (
+              <li key={it.id}>
+                <Link href={`/items/${it.id}`} className="flex items-center gap-4 py-5">
+                  <span className="size-14 shrink-0 overflow-hidden rounded-xl bg-neutral-100">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    {it.thumb && <img src={it.thumb} alt="" className="size-full object-cover" />}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-baseline gap-2">
+                      <span className="truncate font-bold">{it.name}</span>
+                      <span className="ml-auto shrink-0 text-xs text-neutral-400">{chatTime(it.createdAt)}</span>
+                    </span>
+                    <span className="mt-1 flex items-center gap-2">
+                      <span className="min-w-0 flex-1 truncate text-[13px] text-neutral-400">아직 대화가 없어요 · 눌러서 보기·수정</span>
+                      <span className="shrink-0 rounded-full bg-brand/10 px-2.5 py-1 text-xs font-bold text-brand">나눔 중</span>
+                    </span>
+                  </span>
+                </Link>
+              </li>
+            ))}
             {rows.map((r) => {
               const st = TRANSFER_STATUS[r.status];
               return (

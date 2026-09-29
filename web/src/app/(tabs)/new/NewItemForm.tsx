@@ -22,12 +22,18 @@ type Pick = { id: string; file?: File; preview: string; url?: string; status?: "
 type Org = { name: string; address: string | null; lat: number | null; lng: number | null };
 type Place = { name: string; address: string | null; lat: number | null; lng: number | null };
 
+// QA 1차(2026-09-29): 물품 히스토리·대장 등재·취득 재원 입력을 뺐다. 관리 정보는 처분 승인 하나, 필수.
 const EMPTY = {
-  category: "", name: "", description: "", history: "", quantity: 1,
-  isUsed: null as boolean | null, condition: "", onLedger: false, approvalConfirmed: false, fundingSource: "",
+  category: "", name: "", description: "", quantity: 1,
+  isUsed: null as boolean | null, condition: "", approvalConfirmed: false,
 };
 type Form = typeof EMPTY;
 type Draft = { photos: { id: string; url: string }[]; f: Form; place: Place; savedAt: string };
+/** 게시물 수정(QA 1차) — 같은 폼을 이 값으로 채워 바로 입력 화면에서 연다. 임시저장은 쓰지 않는다. */
+export type EditInit = { id: string; photos: string[]; f: Form; place: Place };
+
+/** 물품 종류 아래 늘 보이는 안내 (QA 1차 문구) */
+const LEDGER_NOTICE = "기관 및 지자체 물품 대장에 등재되지 않은 소모품만 나눔할 수 있어요. 내부 승인을 받은 뒤 등록해 주세요.";
 
 /** 임시저장 — 이 기기 브라우저에만 (다른 기기에서 이어 쓰기는 안 된다). 사진은 이미 올린 URL만 담는다. */
 const draftKey = (userId: string) => `nanum:new-draft:${userId}`;
@@ -35,18 +41,19 @@ function readDraft(userId: string): Draft | null {
   try { const raw = localStorage.getItem(draftKey(userId)); return raw ? JSON.parse(raw) : null; } catch { return null; }
 }
 
-export function NewItemForm({ categories, org, userId }: { categories: Category[]; org: Org; userId: string }) {
+export function NewItemForm({ categories, org, userId, edit }: { categories: Category[]; org: Org; userId: string; edit?: EditInit }) {
   const router = useRouter();
-  const [step, setStep] = useState<"photos" | "info">("photos");
-  const [pool, setPool] = useState<Pick[]>([]);          // 가져온 사진, 최근 것이 앞
-  const [order, setOrder] = useState<string[]>([]);      // 선택 순서 (Pick.id). 1번이 대표
+  const initPicks = edit?.photos.map((url, i) => ({ id: `e${i}`, url, preview: url })) ?? [];
+  const [step, setStep] = useState<"photos" | "info">(edit ? "info" : "photos");
+  const [pool, setPool] = useState<Pick[]>(initPicks);          // 가져온 사진, 최근 것이 앞
+  const [order, setOrder] = useState<string[]>(initPicks.map((p) => p.id));      // 선택 순서 (Pick.id). 1번이 대표
   const [camera, setCamera] = useState(false);          // 우리 카메라 화면 (70-25 안내 → 70-26)
   const nativeCamera = useRef<HTMLInputElement>(null);  // 카메라를 못 열 때 폰 기본 카메라
   const [err, setErr] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [f, setF] = useState<Form>(EMPTY);
-  const [place, setPlace] = useState<Place>({ name: org.name, address: org.address, lat: org.lat, lng: org.lng });
+  const [f, setF] = useState<Form>(edit?.f ?? EMPTY);
+  const [place, setPlace] = useState<Place>(edit?.place ?? { name: org.name, address: org.address, lat: org.lat, lng: org.lng });
   const [picking, setPicking] = useState(false);       // 위치 변경 — 전체 화면 장소 선택기
   const previews = useRef<string[]>([]);
   const dragId = useRef<string | null>(null);
@@ -56,21 +63,20 @@ export function NewItemForm({ categories, org, userId }: { categories: Category[
 
   // 임시저장 복원 — 저장해 둔 게 있으면 바로 입력 화면으로 (기획: "재진입 시 바로 복원")
   useEffect(() => {
+    if (edit) return;   // 수정은 저장된 글에서 시작한다
     void Promise.resolve().then(() => {
       const d = readDraft(userId);
       if (!d?.photos.length) return;
       setPool(d.photos.map((p) => ({ id: p.id, url: p.url, preview: p.url })));
       setOrder(d.photos.map((p) => p.id));
-      setF({ ...EMPTY, ...d.f });
+      setF({ ...EMPTY, ...d.f, approvalConfirmed: !!d.f.approvalConfirmed });
       setPlace(d.place);
       setStep("info");
       setNote("임시저장한 글을 불러왔어요.");
     });
-  }, [userId]);
+  }, [userId, edit]);
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setF((s) => ({ ...s, [k]: v }));
-  const cat = categories.find((c) => c.code === f.category);
-  const red = cat?.riskLevel === "red";
   const picked = order.map((id) => pool.find((p) => p.id === id)!).filter(Boolean);
 
   /** 새로 가져온 사진은 자리가 있는 만큼 바로 선택한다 (가져온 순서대로 번호). */
@@ -146,22 +152,22 @@ export function NewItemForm({ categories, org, userId }: { categories: Category[
   async function submit() {
     setBusy(true); setErr(null);
     const custom = place.lat !== org.lat || place.lng !== org.lng || place.name !== org.name;   // 기관 위치 그대로면 비워 둔다
-    const r = await fetch("/api/items", {
-      method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        ...f, photos: picked.map((p) => p.url), quantityUnit: "개",
-        isUsed: f.isUsed === true, fundingSource: f.fundingSource || null,
-        ...(custom ? { pickupPlace: place.name, pickupAddress: place.address, pickupLat: place.lat, pickupLng: place.lng } : {}),
-      }),
-    });
+    const body = {
+      ...f, photos: picked.map((p) => p.url), quantityUnit: "개", isUsed: f.isUsed === true,
+      ...(custom ? { pickupPlace: place.name, pickupAddress: place.address, pickupLat: place.lat, pickupLng: place.lng } : {}),
+    };
+    const r = edit
+      ? await fetch(`/api/items/${edit.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "update", ...body }) })
+      : await fetch("/api/items", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
     const j = await r.json().catch(() => ({}));
-    if (!r.ok) { setErr(j.error ?? "등록하지 못했어요."); setBusy(false); return; }
+    if (!r.ok) { setErr(j.error ?? (edit ? "고치지 못했어요." : "등록하지 못했어요.")); setBusy(false); return; }
+    if (edit) { router.replace(`/items/${edit.id}`); router.refresh(); return; }
     try { localStorage.removeItem(draftKey(userId)); } catch { /* 저장소를 못 써도 등록은 끝났다 */ }
     router.replace(`/new/done?id=${j.id}`);
   }
 
   const canSubmit = picked.length > 0 && picked.every((p) => p.url) && f.category && f.name.trim()
-    && f.quantity >= 1 && f.isUsed !== null && f.condition && (!red || f.approvalConfirmed);
+    && f.quantity >= 1 && f.isUsed !== null && f.condition && f.approvalConfirmed;
 
   // ── 1. 사진 선택 ────────────────────────────────────────────────────────
   if (step === "photos") {
@@ -254,8 +260,10 @@ export function NewItemForm({ categories, org, userId }: { categories: Category[
     <main className="fixed inset-0 z-30 mx-auto flex max-w-md flex-col bg-white">
       <header className="relative flex h-14 shrink-0 items-center justify-between px-2">
         <button type="button" onClick={() => setStep("photos")} aria-label="사진 선택으로" className="size-10 grid place-items-center text-2xl">✕</button>
-        <h1 className="absolute inset-x-20 truncate text-center text-base font-bold pointer-events-none">{org.name}</h1>
-        <button type="button" onClick={saveDraft} className="px-3 text-sm text-neutral-400">임시저장</button>
+        <h1 className="absolute inset-x-20 truncate text-center text-base font-bold pointer-events-none">{edit ? "게시물 수정" : org.name}</h1>
+        {edit
+          ? <button type="button" onClick={() => router.back()} className="px-3 text-sm text-neutral-400">취소</button>
+          : <button type="button" onClick={saveDraft} className="px-3 text-sm text-neutral-400">임시저장</button>}
       </header>
 
       <div className="flex-1 overflow-y-auto px-5 pb-6">
@@ -294,13 +302,11 @@ export function NewItemForm({ categories, org, userId }: { categories: Category[
           {categories.map((c) => (
             <button key={c.code} type="button" onClick={() => set("category", c.code)} aria-pressed={f.category === c.code}
               className={pill(f.category === c.code)}>
-              {c.riskLevel === "red" ? "⚠ " : ""}{c.label}
+              {c.label}
             </button>
           ))}
         </div>
-        {cat?.notice && (
-          <p className={`mt-2 rounded-xl p-3 text-xs ${red ? "bg-red-50 text-red-800" : "bg-amber-50 text-amber-800"}`}>{cat.notice}</p>
-        )}
+        <p className="mt-2 rounded-xl bg-accent/5 p-3 text-xs leading-relaxed text-accent">{LEDGER_NOTICE}</p>
 
         <p className={`${label} mt-6`}>수량</p>
         <div className="flex h-12 w-36 items-center justify-between rounded-2xl border border-neutral-200 px-2">
@@ -331,7 +337,7 @@ export function NewItemForm({ categories, org, userId }: { categories: Category[
 
         <label htmlFor="desc" className={`${label} mt-6`}>자세한 설명</label>
         <textarea id="desc" className="field h-32 py-3 leading-relaxed" value={f.description} onChange={(e) => set("description", e.target.value)}
-          placeholder={"물품에 대한 TMI를 알려주세요.\n희망하는 거래 방식(방문 수령·전달 방법 등)이나 같이 드리는 덤 물품도 여기에 적어주세요."} />
+          placeholder={"물품에 대한 TMI를 알려주세요.\n어떤 사업을 위해 구매하셨나요? 희망하는 거래 방식(방문 수령·전달 방법 등)과 물품의 사이즈와 상태를 적어주세요."} />
 
         {/* 거래 희망 장소 — 기본은 우리 기관. 바꾸면 상세 지도·거리·카드의 "구"가 이 장소 기준이 된다 */}
         <p className={`${label} mt-6`}>거래 희망 장소</p>
@@ -352,57 +358,26 @@ export function NewItemForm({ categories, org, userId }: { categories: Category[
           </div>
         </div>
 
-        <label htmlFor="hist" className={`${label} mt-6`}>물품 히스토리 <span className="font-normal text-neutral-400">(선택)</span></label>
-        <input id="hist" className="field" value={f.history} maxLength={200} onChange={(e) => set("history", e.target.value)}
-          placeholder="어떤 히스토리가 있는지 간단하게 작성해주세요." />
-
-        {/* 관리 정보 — Figma엔 없지만 법적 검토 §5의 기록 항목(MVP 첫 커밋부터). 사람이 입력한다(AGENTS 불변 4).
-            🔴(전기·소형비품)는 처분 승인이 있어야 등록된다 — 화면·API·DB CHECK 3중 */}
-        <p className={`${label} mt-8`}>
-          관리 정보 {red ? <span className="font-normal text-accent">(필수)</span> : <span className="font-normal text-neutral-400">(선택)</span>}
-        </p>
-        <p className="-mt-1 mb-3 text-xs leading-relaxed text-neutral-400">
-          공공 예산으로 산 물품은 나눔 기록이 필요해요. 모르면 비워 둬도 돼요.
-        </p>
-        <div className="space-y-2">
-          {([
-            ["onLedger", "물품 대장에 등재된 물품이에요", "기관 물품 대장에 올라 있는 물품", false],
-            ["approvalConfirmed", "내부 처분 승인을 받았어요", "기관에서 나눔(처분)을 승인받음", red],
-          ] as const).map(([k, title, sub, must]) => {
-            const on = f[k];
-            return (
-              <button key={k} type="button" role="checkbox" aria-checked={on} onClick={() => set(k, !on)}
-                className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left transition ${
-                  on ? "border-brand bg-brand/5" : must ? "border-accent/40" : "border-neutral-200"}`}>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-semibold text-neutral-900">
-                    {title}{must && <span className="ml-1 text-xs font-bold text-accent">필수</span>}
-                  </span>
-                  <span className="block text-xs text-neutral-400">{sub}</span>
-                </span>
-                <span aria-hidden className={`size-6 shrink-0 rounded-full grid place-items-center ${on ? "bg-brand text-white" : "border-2 border-neutral-300"}`}>
-                  {on && <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-        <p className="mt-4 mb-2 text-sm font-semibold text-neutral-700">취득 재원</p>
-        <div className="flex gap-2">
-          {(["자체예산", "보조금", "기타", "모름"] as const).map((v) => {
-            const on = (f.fundingSource || "모름") === v;
-            return (
-              <button key={v} type="button" onClick={() => set("fundingSource", v === "모름" ? "" : v)} aria-pressed={on}
-                className={`${pill(on)} flex-1 px-2`}>{v}</button>
-            );
-          })}
-        </div>
+        {/* 관리 정보(필수) — 처분 승인 하나. 사람이 확인한다(AGENTS 불변 4). API도 막는다(lib/itemInput.ts, decisions/0011) */}
+        <p className={`${label} mt-8`}>관리 정보 <span className="font-normal text-accent">(필수)</span></p>
+        <p className="-mt-1 mb-3 text-xs leading-relaxed text-neutral-400">공공 예산으로 산 물품은 나눔 전 확인이 필요해요.</p>
+        <button type="button" role="checkbox" aria-checked={f.approvalConfirmed} onClick={() => set("approvalConfirmed", !f.approvalConfirmed)}
+          className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left transition ${
+            f.approvalConfirmed ? "border-brand bg-brand/5" : "border-accent/40"}`}>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold text-neutral-900">내부 처분 승인을 받았어요</span>
+            <span className="block text-xs text-neutral-400">기관에서 나눔(처분)을 승인받음</span>
+          </span>
+          <span aria-hidden className={`size-6 shrink-0 rounded-full grid place-items-center ${f.approvalConfirmed ? "bg-brand text-white" : "border-2 border-neutral-300"}`}>
+            {f.approvalConfirmed && <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>}
+          </span>
+        </button>
 
         {err && <p className="mt-4 text-center text-sm text-accent">{err}</p>}
       </div>
 
       <div className="shrink-0 px-5 pt-3 pb-[calc(16px+env(safe-area-inset-bottom))]">
-        <button onClick={submit} disabled={!canSubmit || busy} className="btn-cta">{busy ? "올리는 중…" : "작성완료"}</button>
+        <button onClick={submit} disabled={!canSubmit || busy} className="btn-cta">{busy ? (edit ? "저장 중…" : "올리는 중…") : edit ? "수정 완료" : "작성완료"}</button>
       </div>
 
       {picking && (

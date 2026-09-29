@@ -119,7 +119,7 @@ expect "합류는 member"        "member"   "$(api "$D" GET /api/me | body | jge
 echo "2b. 관심 자원 — 기획 정의서 STEP 3 (4개 이상, 🔴 제외)"
 FOUR='{"categories":["stationery","packaging","craft","disposable"]}'
 expect "3개는 400"        "400" "$(api "$A" PUT /api/me/interests '{"categories":["stationery","packaging","craft"]}' | status)"
-expect "🔴 섞이면 400"    "400" "$(api "$A" PUT /api/me/interests '{"categories":["stationery","packaging","craft","electronics"]}' | status)"
+expect "없는 카테고리(전기류) 섞이면 400"    "400" "$(api "$A" PUT /api/me/interests '{"categories":["stationery","packaging","craft","electronics"]}' | status)"
 expect "없는 코드 400"    "400" "$(api "$A" PUT /api/me/interests '{"categories":["stationery","packaging","craft","nope"]}' | status)"
 expect "4개 저장 200"     "200" "$(api "$A" PUT /api/me/interests "$FOUR" | status)"
 expect "4개 저장"         "4"   "$(api "$A" GET /api/me/interests | body | count)"
@@ -144,19 +144,20 @@ echo "4. 등록 — 사진 업로드 → 물품"
 printf 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==' | base64 -d > "$J/p.png"
 URL=$(curl -s -b "$A" -F "file=@$J/p.png;type=image/png" "$BASE/api/uploads" | jget url)
 expect "업로드 url" "/uploads/" "$(echo "$URL" | cut -c1-9)"
-ITEM_JSON="{\"category\":\"packaging\",\"name\":\"크라프트 종이봉투\",\"quantity\":20,\"quantityUnit\":\"장\",\"isUsed\":false,\"condition\":\"상\",\"description\":\"행사 후 남았어요\",\"photos\":[\"$URL\"]}"
+ITEM_JSON="{\"category\":\"packaging\",\"name\":\"크라프트 종이봉투\",\"quantity\":20,\"quantityUnit\":\"장\",\"isUsed\":false,\"condition\":\"상\",\"description\":\"행사 후 남았어요\",\"approvalConfirmed\":true,\"photos\":[\"$URL\"]}"
 R=$(api "$A" POST /api/items "$ITEM_JSON"); expect "등록 201" "201" "$(echo "$R" | status)"
 ITEM=$(echo "$R" | body | jget id)
-RED_NO="{\"category\":\"electronics\",\"name\":\"선풍기\",\"quantity\":1,\"condition\":\"중\",\"isUsed\":true,\"photos\":[\"$URL\"]}"
-RED_OK="{\"category\":\"electronics\",\"name\":\"선풍기\",\"quantity\":1,\"condition\":\"중\",\"isUsed\":true,\"approvalConfirmed\":true,\"onLedger\":true,\"fundingSource\":\"자체예산\",\"photos\":[\"$URL\"]}"
-BAD_COND="{\"category\":\"packaging\",\"name\":\"x\",\"quantity\":1,\"condition\":\"새것\",\"isUsed\":false,\"photos\":[\"$URL\"]}"
+NO_APPROVAL="{\"category\":\"packaging\",\"name\":\"승인 없음\",\"quantity\":1,\"condition\":\"중\",\"isUsed\":true,\"photos\":[\"$URL\"]}"
+GONE_CAT="{\"category\":\"electronics\",\"name\":\"선풍기\",\"quantity\":1,\"condition\":\"중\",\"isUsed\":true,\"approvalConfirmed\":true,\"photos\":[\"$URL\"]}"
+BAD_COND="{\"category\":\"packaging\",\"name\":\"x\",\"quantity\":1,\"condition\":\"새것\",\"isUsed\":false,\"approvalConfirmed\":true,\"photos\":[\"$URL\"]}"
 expect "표시 라벨을 그대로 보내면 400" "400" "$(api "$A" POST /api/items "$BAD_COND" | status)"
-EMPTY_PHOTO="{\"category\":\"packaging\",\"name\":\"x\",\"quantity\":1,\"condition\":\"상\",\"isUsed\":false,\"photos\":[\"\"]}"
-EXT_PHOTO="{\"category\":\"packaging\",\"name\":\"x\",\"quantity\":1,\"condition\":\"상\",\"isUsed\":false,\"photos\":[\"https://evil.example/x.jpg\"]}"
+EMPTY_PHOTO="{\"category\":\"packaging\",\"name\":\"x\",\"quantity\":1,\"condition\":\"상\",\"isUsed\":false,\"approvalConfirmed\":true,\"photos\":[\"\"]}"
+EXT_PHOTO="{\"category\":\"packaging\",\"name\":\"x\",\"quantity\":1,\"condition\":\"상\",\"isUsed\":false,\"approvalConfirmed\":true,\"photos\":[\"https://evil.example/x.jpg\"]}"
 expect "물품 빈 사진 주소 400"   "400" "$(api "$A" POST /api/items "$EMPTY_PHOTO" | status)"
 expect "물품 외부 사진 주소 400" "400" "$(api "$A" POST /api/items "$EXT_PHOTO" | status)"
-expect "🔴 전기류 승인 없이 400" "400" "$(api "$A" POST /api/items "$RED_NO" | status)"
-expect "🔴 전기류 승인 있으면 201" "201" "$(api "$A" POST /api/items "$RED_OK" | status)"
+# 관리 정보: 내부 처분 승인은 모든 물품 필수 (decisions/0011)
+expect "처분 승인 없이 400" "400" "$(api "$A" POST /api/items "$NO_APPROVAL" | status)"
+expect "뺀 카테고리(전기·소형비품) 400" "400" "$(api "$A" POST /api/items "$GONE_CAT" | status)"
 
 echo "5. 스와이프·목록 — B에게 보이고 A에겐 안 보임"
 expect "B 피드에 있음" "True"  "$(api "$B" GET /api/items | body | has $ITEM)"
@@ -174,13 +175,10 @@ expect "카테고리 필터" "True" "$(api "$B" GET "/api/items?mode=list&catego
 echo "5b. 추천 정렬 — B의 관심 자원이 최신순보다 앞에"
 # B의 관심은 event/interior/printed/banner. interior를 먼저, 관심 밖 stationery를 나중에 등록한다.
 # 최신순만이라면 나중에 등록한 stationery가 1번이어야 한다 — 관심이 이기면 정렬이 도는 것이다.
-OLD_INT="{\"category\":\"interior\",\"name\":\"액자 세트\",\"history\":\"작년 청년주간 행사 때 쓴 액자\",\"quantity\":3,\"condition\":\"중\",\"isUsed\":true,\"photos\":[\"$URL\"]}"
-NEW_OFF="{\"category\":\"stationery\",\"name\":\"네임펜 한 박스\",\"quantity\":50,\"condition\":\"상\",\"isUsed\":false,\"photos\":[\"$URL\"]}"
+OLD_INT="{\"category\":\"interior\",\"name\":\"액자 세트\",\"quantity\":3,\"condition\":\"중\",\"isUsed\":true,\"approvalConfirmed\":true,\"photos\":[\"$URL\"]}"
+NEW_OFF="{\"category\":\"stationery\",\"name\":\"네임펜 한 박스\",\"quantity\":50,\"condition\":\"상\",\"isUsed\":false,\"approvalConfirmed\":true,\"photos\":[\"$URL\"]}"
 INT_ID=$(api "$A" POST /api/items "$OLD_INT" | body | jget id)
 OFF_ID=$(api "$A" POST /api/items "$NEW_OFF" | body | jget id)
-expect "물품 히스토리 저장" "작년 청년주간 행사 때 쓴 액자" "$(api "$B" GET "/api/items/$INT_ID" | body | jget history)"
-LONG_HIST="{\"category\":\"interior\",\"name\":\"긴 히스토리\",\"history\":\"$(printf '가%.0s' $(seq 201))\",\"quantity\":1,\"condition\":\"중\",\"isUsed\":true,\"photos\":[\"$URL\"]}"
-expect "히스토리 200자 초과 400" "400" "$(api "$A" POST /api/items "$LONG_HIST" | status)"
 
 expect "관심(interior)이 1번" "$INT_ID" "$(api "$B" GET /api/items | body | first)"
 # A는 관심을 stationery 포함으로 골랐지만 둘 다 자기 기관 것이라 안 보인다 — 정렬이 소속 규칙을 뚫지 않는다.
@@ -194,12 +192,12 @@ expect "한 글자는 빈 목록"   "0"    "$(api "$A" GET "/api/places?q=a" | b
 read GLAT GLNG <<< "$(api "$A" GET "/api/places?q=%EC%84%9C%EC%9A%B8%ED%8A%B9%EB%B3%84%EC%8B%9C%20%EA%B0%95%EB%8F%99%EA%B5%AC%20%EC%98%AC%EB%A6%BC%ED%94%BD%EB%A1%9C%20610" | body | first_ll)"
 expect "핀 → 주소"           "True" "$(api "$A" GET "/api/places/reverse?lat=$GLAT&lng=$GLNG" | body | python3 -c 'import sys,json; print("강동구" in (json.load(sys.stdin)["address"] or ""))')"
 expect "한국 밖 핀 400"      "400"  "$(api "$A" GET "/api/places/reverse?lat=0&lng=0" | status)"
-PICK="{\"category\":\"packaging\",\"name\":\"장소 지정 박스\",\"quantity\":1,\"condition\":\"중\",\"isUsed\":true,\"photos\":[\"$URL\"],\"pickupPlace\":\"강동 창고\",\"pickupAddress\":\"서울 강동구 올림픽로 610\",\"pickupLat\":$GLAT,\"pickupLng\":$GLNG}"
+PICK="{\"category\":\"packaging\",\"name\":\"장소 지정 박스\",\"quantity\":1,\"condition\":\"중\",\"isUsed\":true,\"approvalConfirmed\":true,\"photos\":[\"$URL\"],\"pickupPlace\":\"강동 창고\",\"pickupAddress\":\"서울 강동구 올림픽로 610\",\"pickupLat\":$GLAT,\"pickupLng\":$GLNG}"
 PICK_ID=$(api "$A" POST /api/items "$PICK" | body | jget id)
 expect "거래 장소 저장" "강동 창고" "$(api "$B" GET "/api/items/$PICK_ID" | body | jget pickupPlace)"
 # A 기관(세종대로)·B 기관(사직로)은 1~2km. 거래 장소가 강동이면 10km를 넘어야 한다 — 거리가 장소 기준이라는 뜻
 expect "거리는 거래 장소 기준" "True" "$(api "$B" GET /api/items | body | dist $PICK_ID | python3 -c 'import sys; v=sys.stdin.read().strip(); print(v not in ("None","missing") and float(v) > 10)')"
-BADPICK="{\"category\":\"packaging\",\"name\":\"좌표 틀림\",\"quantity\":1,\"condition\":\"중\",\"isUsed\":true,\"photos\":[\"$URL\"],\"pickupLat\":0,\"pickupLng\":0}"
+BADPICK="{\"category\":\"packaging\",\"name\":\"좌표 틀림\",\"quantity\":1,\"condition\":\"중\",\"isUsed\":true,\"approvalConfirmed\":true,\"photos\":[\"$URL\"],\"pickupLat\":0,\"pickupLng\":0}"
 expect "한국 밖 좌표 400" "400" "$(api "$A" POST /api/items "$BADPICK" | status)"
 
 echo "5c. 북마크 — 하트 켜기/끄기, 프로필 > 북마크"
@@ -221,7 +219,7 @@ GD=$(api "$E" GET "/api/orgs/search?q=%EA%B0%95%EB%8F%99" | body | orgid "서울
 MP=$(api "$F" GET "/api/orgs/search?q=%EB%A7%88%ED%8F%AC" | body | orgid "서울청년센터 마포")
 JOIN_GD="{\"orgId\":\"$GD\",\"bizNo\":\"3098100129\"}"; JOIN_MP="{\"orgId\":\"$MP\",\"bizNo\":\"3098100129\"}"
 api "$E" POST /api/orgs "$JOIN_GD" >/dev/null; api "$F" POST /api/orgs "$JOIN_MP" >/dev/null
-GD_ITEM_BODY="{\"category\":\"packaging\",\"name\":\"거리 확인용 박스\",\"quantity\":1,\"condition\":\"중\",\"isUsed\":true,\"photos\":[\"$URL\"]}"
+GD_ITEM_BODY="{\"category\":\"packaging\",\"name\":\"거리 확인용 박스\",\"quantity\":1,\"condition\":\"중\",\"isUsed\":true,\"approvalConfirmed\":true,\"photos\":[\"$URL\"]}"
 GD_ITEM=$(api "$E" POST /api/items "$GD_ITEM_BODY" | body | jget id)
 expect "마포에서 본 강동 물품 18.7km" "18.7" "$(api "$F" GET /api/items | body | dist $GD_ITEM)"
 # B는 직접 등록한 기관이지만 가입 때 주소를 받아 좌표가 있다 — 거리가 나와야 한다 (종로 사직로 ↔ 강동)
@@ -278,6 +276,20 @@ wait
 WINS=$( { cat "$J/r1"; echo; cat "$J/r2"; echo; } | grep -c '^200$' || true)
 expect "동시 schedule 2건 중 성공은 정확히 1" "1" "$WINS"
 expect "물품은 reserved" "reserved" "$(api "$B" GET "/api/items/$ITEM3" | body | jget status)"
+
+echo "7c. 게시물 수정 (QA 1차) — 등록자만, 처분 승인 다시 확인"
+EDIT_OK="{\"action\":\"update\",\"category\":\"stationery\",\"name\":\"네임펜 두 박스\",\"quantity\":2,\"condition\":\"상\",\"isUsed\":false,\"approvalConfirmed\":true,\"photos\":[\"$URL\"]}"
+EDIT_NOAPP="{\"action\":\"update\",\"category\":\"stationery\",\"name\":\"x\",\"quantity\":1,\"condition\":\"상\",\"isUsed\":false,\"photos\":[\"$URL\"]}"
+expect "B가 A 물품 수정 403"      "403" "$(api "$B" PATCH "/api/items/$OFF_ID" "$EDIT_OK" | status)"
+expect "승인 없이 수정 400"       "400" "$(api "$A" PATCH "/api/items/$OFF_ID" "$EDIT_NOAPP" | status)"
+expect "A 수정 200"               "200" "$(api "$A" PATCH "/api/items/$OFF_ID" "$EDIT_OK" | status)"
+expect "바뀐 이름"                "네임펜 두 박스" "$(api "$B" GET "/api/items/$OFF_ID" | body | jget name)"
+expect "바뀐 수량"                "2" "$(api "$B" GET "/api/items/$OFF_ID" | body | jget quantity)"
+expect "완료된 물품 수정 400"     "400" "$(api "$A" PATCH "/api/items/$ITEM" "$EDIT_OK" | status)"
+expect "수정 화면 200"            "200" "$(curl -s -o /dev/null -b "$A" -w '%{http_code}' "$BASE/items/$OFF_ID/edit")"
+expect "남의 물품 수정 화면 404"  "404" "$(nf "$B" "/items/$OFF_ID/edit")"
+# 메시지 > 등록한 물품: 대화 없는 내 게시물도 보인다
+expect "등록한 물품 탭에 대화 없는 게시물" "yes" "$(see "$A" "/messages?tab=mine" "네임펜 두 박스")"
 
 echo "8. 내리기"
 R=$(api "$A" POST /api/items "$ITEM_JSON"); ITEM2=$(echo "$R" | body | jget id)

@@ -109,6 +109,7 @@ export function ChatRoom({ transferId, me, owner, requester, item, transferStatu
   const closed = transferStatus === "cancelled" || transferStatus === "completed";
   const reservedElsewhere = item.status === "reserved" && transferStatus !== "scheduled";
   const st = TRANSFER_STATUS[transferStatus] ?? { label: "", cls: "" };
+  const ownerReplied = msgs.some((m) => m.senderId === owner.id);
 
   // 예약 확정 알림 (기획 정의서 338-13 등록자 카드 / 338-14 신청자 한 줄). 확정 뒤 첫 메시지 앞, 없으면 대화 끝.
   const showEvent = !!scheduledAt && (transferStatus === "scheduled" || transferStatus === "completed");
@@ -251,7 +252,8 @@ export function ChatRoom({ transferId, me, owner, requester, item, transferStatu
             </span>
             <button onClick={() => act("complete")} disabled={!!acting} className="btn-brand shrink-0 px-4 py-2 text-sm disabled:opacity-70">{acting === "complete" ? "처리 중…" : "확인"}</button>
           </div>
-        ) : (
+        ) : !isOwner && transferStatus === "requested" && !ownerReplied ? null : (
+          // 신청자에게 "예약 확정 대기 중"은 등록자가 한 번이라도 답한 뒤에 (QA 1차 — 들어가자마자 뜨면 어색하다)
           <p className="mt-5 flex items-center gap-2 rounded-2xl bg-neutral-100/80 px-4 py-3.5 text-sm text-neutral-700">
             <span aria-hidden className={`size-2 shrink-0 rounded-full ${transferStatus === "cancelled" ? "bg-neutral-400" : "bg-brand"}`} />
             {transferStatus === "completed" ? "나눔이 완료되었습니다. 감사합니다!"

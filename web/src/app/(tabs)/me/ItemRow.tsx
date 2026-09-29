@@ -61,7 +61,7 @@ export function ItemRow({ item, showOpen, withdrawable }: { item: ProfileRow; sh
           {item.photos[0] && <img src={item.photos[0]} alt="" className="size-full object-cover" />}
         </span>
         <span className="flex min-w-0 flex-1 flex-col px-3.5 py-3">
-          <span className="truncate pr-8 font-bold">{item.name}</span>
+          <span className={`truncate font-bold ${withdrawable ? "pr-28" : "pr-8"}`}>{item.name}</span>
           <span className="mt-1 truncate text-xs text-neutral-400">{item.orgName} · {ago(item.createdAt)}</span>
           {pill && <span className={`mt-2 self-start rounded-full px-2.5 py-1 text-xs font-bold ${pill[1]}`}>{pill[0]}</span>}
           <span className="mt-auto flex items-center justify-end gap-1 text-xs text-neutral-500" aria-label={`북마크 ${count}`}>
@@ -72,10 +72,17 @@ export function ItemRow({ item, showOpen, withdrawable }: { item: ProfileRow; sh
       {withdrawable ? (
         item.status !== "completed" && (
           <>
-            <button onClick={() => { setErr(null); setAsk(true); }}
-              className="absolute right-3 top-3 rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-medium text-neutral-500 outline-none hover:bg-neutral-200 focus-visible:ring-2 focus-visible:ring-brand/40">
-              내리기
-            </button>
+            <span className="absolute right-3 top-3 flex gap-1.5">
+              {/* 게시물 수정 (QA 1차) */}
+              <Link href={`/items/${item.id}/edit`}
+                className="rounded-full bg-brand/10 px-2.5 py-1 text-xs font-medium text-brand outline-none hover:bg-brand/15 focus-visible:ring-2 focus-visible:ring-brand/40">
+                수정
+              </Link>
+              <button onClick={() => { setErr(null); setAsk(true); }}
+                className="rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-medium text-neutral-500 outline-none hover:bg-neutral-200 focus-visible:ring-2 focus-visible:ring-brand/40">
+                내리기
+              </button>
+            </span>
             <ConfirmDialog open={ask} danger busy={busy} error={err}
               title="이 물품을 내릴까요?"
               desc={`"${item.name}"이(가) 목록에서 사라지고, 진행 중인 대화는 종료돼요. 대화 기록은 남아요.`}

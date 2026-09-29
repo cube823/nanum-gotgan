@@ -1,8 +1,7 @@
 import { sql } from "@/lib/db";
-import { api, requireUser, requireVerified, HttpError } from "@/lib/session";
+import { api, requireUser, requireVerified } from "@/lib/session";
 import { swipeFeed, listFeed } from "@/lib/items";
-import { CONDITIONS } from "@/lib/labels";
-import { isStoredImage } from "@/lib/storage";
+import { parseItemInput } from "@/lib/itemInput";
 
 export const GET = api(async (req) => {
   const u = await requireUser();
@@ -14,53 +13,22 @@ export const GET = api(async (req) => {
   return Response.json(await swipeFeed(u.id, u.orgId));
 });
 
-const CONDITION_SET = new Set<string>(CONDITIONS);
-const FUNDING = new Set(["자체예산", "보조금", "기타", "모름"]);
-
-/** MVP §4.1 등록. 🔴는 DB 제약이 한 번 더 막는다. */
+/** MVP §4.1 등록. 검사는 lib/itemInput.ts (수정과 같이 쓴다). */
 export const POST = api(async (req) => {
   const u = await requireVerified();
-  const b = await req.json();
-
-  const name = String(b.name ?? "").trim();
-  const quantity = Number(b.quantity);
-  const photos: string[] = Array.isArray(b.photos) ? b.photos.filter((x: unknown) => typeof x === "string") : [];
-
-  if (!name) throw new HttpError(400, "물품 이름을 적어 주세요.");
-  if (!Number.isInteger(quantity) || quantity < 1) throw new HttpError(400, "수량은 1 이상이어야 해요.");
-  if (!CONDITION_SET.has(b.condition)) throw new HttpError(400, "상태를 골라 주세요.");
-  if (photos.length < 1 || photos.length > 10) throw new HttpError(400, "사진은 1~10장이어야 해요.");
-  // /api/uploads로 올린 것만. 빈 문자열·외부 주소가 item_photos에 박히면 카드에 깨진 사진이 뜬다.
-  if (!photos.every(isStoredImage)) throw new HttpError(400, "사진을 다시 올려 주세요.");
-  if (b.fundingSource && !FUNDING.has(b.fundingSource)) throw new HttpError(400, "취득 재원이 올바르지 않아요.");
-  const history = String(b.history ?? "").trim() || null;   // 선택. 단답형
-  if (history && history.length > 200) throw new HttpError(400, "물품 히스토리는 200자 이하로 적어 주세요.");
-
-  // 거래 희망 장소 (선택). 좌표는 위치 변경(/api/places·지도 핀)이 준 값 — 한국 범위 밖이면 받지 않는다. 비우면 기관 위치를 쓴다.
-  const pickupPlace = String(b.pickupPlace ?? "").trim().slice(0, 100) || null;
-  const pickupAddress = String(b.pickupAddress ?? "").trim().slice(0, 200) || null;
-  const [pLat, pLng] = [Number(b.pickupLat), Number(b.pickupLng)];
-  const hasCoord = b.pickupLat != null && b.pickupLng != null;
-  if (hasCoord && !(pLat > 33 && pLat < 39 && pLng > 124 && pLng < 132)) throw new HttpError(400, "거래 희망 장소 좌표가 올바르지 않아요.");
-
-  const [cat] = await sql`SELECT code, risk_level FROM categories WHERE code = ${String(b.category)}`;
-  if (!cat) throw new HttpError(400, "카테고리를 골라 주세요.");
-  if (cat.riskLevel === "red" && !b.approvalConfirmed) {
-    throw new HttpError(400, "전기·소형비품은 내부 처분 승인을 확인한 뒤 등록할 수 있어요.");
-  }
+  const v = await parseItemInput(await req.json());
 
   const id = await sql.begin(async (tx) => {
     const [item] = await tx`
-      INSERT INTO items (org_id, created_by, category, name, description, history,
+      INSERT INTO items (org_id, created_by, category, name, description,
                          pickup_place, pickup_address, pickup_lat, pickup_lng, quantity, quantity_unit,
                          is_used, condition, on_ledger, approval_confirmed, funding_source)
-      VALUES (${u.orgId}, ${u.id}, ${cat.code}, ${name}, ${String(b.description ?? "").trim() || null}, ${history},
-              ${pickupPlace}, ${pickupAddress}, ${hasCoord ? pLat : null}, ${hasCoord ? pLng : null},
-              ${quantity}, ${String(b.quantityUnit ?? "개").trim() || "개"},
-              ${!!b.isUsed}, ${b.condition}, ${!!b.onLedger}, ${!!b.approvalConfirmed}, ${b.fundingSource ?? null})
+      VALUES (${u.orgId}, ${u.id}, ${v.category}, ${v.name}, ${v.description},
+              ${v.pickupPlace}, ${v.pickupAddress}, ${v.pickupLat}, ${v.pickupLng},
+              ${v.quantity}, ${v.quantityUnit}, ${v.isUsed}, ${v.condition}, false, true, NULL)
       RETURNING id`;
-    for (let i = 0; i < photos.length; i++) {
-      await tx`INSERT INTO item_photos (item_id, url, sort_order) VALUES (${item.id}, ${photos[i]}, ${i})`;
+    for (let i = 0; i < v.photos.length; i++) {
+      await tx`INSERT INTO item_photos (item_id, url, sort_order) VALUES (${item.id}, ${v.photos[i]}, ${i})`;
     }
     return item.id as string;
   });

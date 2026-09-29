@@ -40,3 +40,8 @@
 - ~~사진이 `public/uploads`에 저장된다~~ — 해소. `BLOB_READ_WRITE_TOKEN`이 있으면 Vercel Blob (`guides/deploy.md`).
 - 등록 전에 업로드된 사진은 중간에 나가면 고아가 된다. 초기엔 무시.
 - `quantity_unit` 자유 텍스트. 실제 값을 보고 enum으로 조일지 결정.
+
+## QA 1차 (2026-09-29)
+
+- 카테고리 이름·순서 변경, 전기·소형비품 제외, 관리 정보 = 처분 승인 하나(필수), 히스토리·대장 등재·취득 재원 입력 제거 — `decisions/0011`.
+- **게시물 수정**: `/items/[id]/edit` (등록 폼 재사용, `NewItemForm`의 `edit`), `PATCH /api/items/[id]` `{action:"update", …}`. 등록자만, 나눔 완료 전까지. 상세의 "게시물 수정하기", 프로필 > 기관 등록 물품의 "수정", 메시지 > 등록한 물품(대화 없는 게시물도 보인다)에서 들어간다. smoke 7c.

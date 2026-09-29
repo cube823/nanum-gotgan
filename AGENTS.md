@@ -16,7 +16,7 @@ docs/               사람용 문서. 지도는 docs/README.md
 ```bash
 pnpm install                # 한 번. 모든 패키지
 pnpm dev | build | typecheck | lint    # web
-pnpm smoke                  # web curl 한 바퀴 141건. dev 서버 필요
+pnpm smoke                  # web curl 한 바퀴 148건. dev 서버 필요
 pnpm test                   # -r: test 스크립트 있는 패키지 전부 (지금은 ai)
 pnpm --filter @nanum/ai try photo.jpg  # 특정 패키지 스크립트
 ```
@@ -27,7 +27,7 @@ DB: `createdb nanum_gotgan && psql -d nanum_gotgan -f db/schema.sql -f db/seed.s
 
 1. **판정은 API가 DB를 보고 한다.** `web/src/proxy.ts`는 리다이렉트만. 쓰기 권한은 `requireVerified()`/`requireUser()`(`web/src/lib/session.ts`)가 DB를 읽어 결정한다. JWT 클레임으로 권한을 판정하지 않는다.
 2. **상태 전이는 트랜잭션 + `FOR UPDATE`.** `items.status`·`transfers.status`를 바꾸는 코드는 읽기·검사·쓰기를 `sql.begin` 안에서 한다. 전이를 추가하면 `docs/design/DB-SCHEMA.md` §3 검산표에 화살표와 화면을 같이 적는다.
-3. **🔴 카테고리(전기·소형비품)는 3중 방어.** UI 비활성 + API 400 + DB CHECK(`chk_red_needs_approval`). 카테고리·등급을 바꾸면 `db/seed.sql`과 `ai/schema.js`의 `CATEGORIES`를 같이 바꾼다 — 아직 한 곳으로 모으지 않았다.
+3. **처분 승인은 모든 물품에 필수.** 등록·수정 모두 UI(체크 없으면 비활성) + API 400(`web/src/lib/itemInput.ts`). 전기·소형비품(🔴)은 카테고리에서 뺐다 — `docs/decisions/0011`. 카테고리를 바꾸면 `db/seed.sql`과 `ai/schema.js`의 `CATEGORIES`를 같이 바꾼다 — 아직 한 곳으로 모으지 않았다.
 4. **법적 필드(`on_ledger`·`approval_confirmed`·`funding_source`)는 사람이 입력한다.** AI가 채우지 않는다.
 5. **SQL은 postgres.js 태그 템플릿만.** 문자열 이어붙이기 금지. 컬럼은 `postgres.camel`로 camelCase가 되어 온다 — TS 타입(`web/src/lib/types.ts`)과 맞춘다.
 6. **실시간 없음.** 채팅은 5초 폴링. WebSocket을 붙이지 않는다.

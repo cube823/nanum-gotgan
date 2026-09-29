@@ -7,12 +7,8 @@ const draft = (over = {}) => ({
   uncertain_fields: [], ...over,
 });
 
-// red는 사람 확인 없이 자동 등록 불가 — 법적 검토 §4의 핵심 방어선
-const red = guard(draft({ category: "electronics" }));
-assert.equal(red.risk, "red");
-assert.equal(red.canAutoPublish, false);
-assert.deepEqual(red.needsHumanInput,
-  ["on_ledger", "approval_confirmed", "funding_source"]);
+// 전기·소형비품(electronics)은 카테고리에서 뺐다 (decisions/0011) — 모르는 코드처럼 etc(yellow)로 떨어진다
+assert.equal(guard(draft({ category: "electronics" })).risk, "yellow");
 
 // yellow는 경고만 하고 통과
 const yellow = guard(draft({ category: "event" }));

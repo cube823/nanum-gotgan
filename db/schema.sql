@@ -92,11 +92,10 @@ CREATE TABLE items (
   status        text NOT NULL DEFAULT 'open'
                 CHECK (status IN ('open', 'reserved', 'completed', 'withdrawn')),
   created_at    timestamptz NOT NULL DEFAULT now(),
-  updated_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now()
 
-  -- red(전기·소형비품)는 승인 확인 없이 open 불가. red 코드가 늘면 여기도 고친다.
-  CONSTRAINT chk_red_needs_approval
-    CHECK (status <> 'open' OR category <> 'electronics' OR approval_confirmed)
+  -- 내부 처분 승인(approval_confirmed)은 모든 물품에 필수 — UI + API(lib/itemInput.ts)가 막는다 (decisions/0011).
+  -- 예전 chk_red_needs_approval(전기·소형비품만)은 카테고리를 빼면서 지웠다.
 );
 
 CREATE INDEX idx_items_swipe ON items (status, created_at DESC) WHERE status = 'open';

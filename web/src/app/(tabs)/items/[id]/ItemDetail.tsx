@@ -9,11 +9,6 @@ import { ChatButton } from "./ChatButton";
 import { KakaoMap } from "@/components/KakaoMap";
 import { SheetCloseButton } from "@/components/Sheet";
 
-const RISK_NOTE: Record<string, string> = {
-  yellow: "반복 사용하는 물품이면 비품으로 관리될 수 있어요.",
-  red: "전기·소형비품이에요. 등록 기관의 내부 승인을 거친 물품이에요.",
-};
-
 /** 기획 정의서 11 — 물품 상세. 스와이프 ↑로 온다.
  *  Figma의 "크기" 행은 뺐다 — 크기 필드가 없다. 위치는 카카오맵(components/KakaoMap) + 두 기관 주소.
  *  좌표 없는 기관(직접 등록한 기관 — 주소를 아직 안 받는다)이면 지도·거리 없이 주소 줄만. */
@@ -112,7 +107,6 @@ export async function ItemDetail({ id, sheet = false }: { id: string; sheet?: bo
           ))}
         </dl>
 
-        {RISK_NOTE[item.riskLevel] && <p className="mt-4 text-xs text-neutral-500 rounded-xl bg-amber-50 p-3">{RISK_NOTE[item.riskLevel]}</p>}
 
         <h2 className="mt-8 font-bold">위치</h2>
         {/* 좌표가 있으면 지도(거리는 지도 위 알약). 없으면 조용히 비우지 말고 왜 없는지 말한다 —
@@ -147,7 +141,10 @@ export async function ItemDetail({ id, sheet = false }: { id: string; sheet?: bo
         <div className={`sticky z-10 -mx-[22px] mt-auto px-[22px] pt-5 pb-[calc(16px+env(safe-area-inset-bottom))]
           bg-gradient-to-t from-white from-75% to-transparent ${sheet ? "bottom-0" : "bottom-16"}`}>
           {mine ? (
-            <Link href="/me" className="btn-ghost w-full">내가 등록한 물품이에요</Link>
+            // 내 물품 — 나눔이 끝나기 전엔 고칠 수 있다 (QA 1차: 게시물 수정)
+            item.status === "completed"
+              ? <button disabled className="btn-ghost w-full">나눔이 끝난 내 물품이에요</button>
+              : <Link href={`/items/${item.id}/edit`} className="btn-cta">게시물 수정하기</Link>
           ) : sameOrg ? (
             <button disabled className="btn-ghost w-full">같은 기관의 물품이에요</button>
           ) : item.status === "completed" ? (

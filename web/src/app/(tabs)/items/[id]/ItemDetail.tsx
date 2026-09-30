@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
-import { requireUser } from "@/lib/session";
+import { pageUser } from "@/lib/session";
 import { getItem, DISTANCE_KM } from "@/lib/items";
 import { STATUS_LABEL } from "@/components/ItemGrid";
 import { CONDITION_LABEL, ago } from "@/lib/labels";
 import { ChatButton } from "./ChatButton";
+import { PhotoCarousel } from "./PhotoCarousel";
 import { KakaoMap } from "@/components/KakaoMap";
 import { SheetCloseButton } from "@/components/Sheet";
 
@@ -13,7 +14,7 @@ import { SheetCloseButton } from "@/components/Sheet";
  *  Figma의 "크기" 행은 뺐다 — 크기 필드가 없다. 위치는 카카오맵(components/KakaoMap) + 두 기관 주소.
  *  좌표 없는 기관(직접 등록한 기관 — 주소를 아직 안 받는다)이면 지도·거리 없이 주소 줄만. */
 export async function ItemDetail({ id, sheet = false }: { id: string; sheet?: boolean }) {
-  const u = await requireUser();
+  const u = await pageUser();
   const item = await getItem(id);
   if (!item || item.status === "withdrawn") notFound();
 
@@ -38,14 +39,8 @@ export async function ItemDetail({ id, sheet = false }: { id: string; sheet?: bo
     <article className={sheet ? "min-h-full flex flex-col" : ""}>
       {/* 기획 정의서 11 — 맨 위 사진(390:300). 시트면 오른쪽 위 ↓로 내리고, 직접 들어온 전체 화면이면 ← 뒤로. */}
       <div className="relative">
-        <div className="flex overflow-x-auto snap-x snap-mandatory">
-          {/* 사진이 없으면 자리만 둔다 — 없애면 ↓·← 버튼이 본문 위에 겹친다 */}
-          {item.photos.length === 0 && <PhotoPlaceholder />}
-          {item.photos.map((p) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img key={p} src={p} alt="" className="w-full aspect-[13/10] object-cover snap-center shrink-0" />
-          ))}
-        </div>
+        {/* 사진이 없으면 자리만 둔다 — 없애면 ↓·← 버튼이 본문 위에 겹친다 */}
+        {item.photos.length === 0 ? <PhotoPlaceholder /> : <PhotoCarousel photos={item.photos} />}
         {sheet
           ? <span className="absolute top-4 right-4 z-20"><SheetCloseButton /></span>
           : <Link href="/swipe" aria-label="뒤로" className="absolute top-3 left-3 size-9 rounded-full bg-black/40 text-white grid place-items-center">←</Link>}

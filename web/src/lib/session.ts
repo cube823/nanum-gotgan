@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { sql } from "./db";
 import type { DbUser } from "./types";
@@ -19,6 +20,14 @@ export async function currentUser(): Promise<DbUser | null> {
 export async function requireUser(): Promise<DbUser> {
   const u = await currentUser();
   if (!u) throw new HttpError(401, "로그인이 필요해요.");
+  return u;
+}
+
+/** 페이지용 requireUser. 토큰은 살아 있는데 DB에 사람이 없으면(초기화·삭제된 계정) 쿠키를 지우고 로그인으로.
+ *  그냥 401을 던지면 화면이 서버 오류로 뜨고, proxy는 토큰만 보고 /login을 /swipe로 돌려보내 빠져나갈 길이 없다. */
+export async function pageUser(): Promise<DbUser> {
+  const u = await currentUser();
+  if (!u) redirect("/api/session/reset");
   return u;
 }
 

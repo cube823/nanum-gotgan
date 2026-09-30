@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { sql } from "@/lib/db";
-import { requireUser } from "@/lib/session";
+import { pageUser } from "@/lib/session";
 import { ymd } from "@/lib/labels";
 import { SubPage } from "../SubPage";
 import { Avatar } from "../Avatar";
 
 // 우리 기관 > 기관 구성원 보기. 이름·역할·가입일만 — 연락처는 보이지 않는다 (상대 프로필과 같은 원칙).
 export default async function MembersPage() {
-  const u = await requireUser();
+  const u = await pageUser();
   const rows = u.orgId ? await sql`
     SELECT id, COALESCE(real_name, nickname) AS name, profile_image, org_role, org_status, created_at
     FROM users WHERE org_id = ${u.orgId}

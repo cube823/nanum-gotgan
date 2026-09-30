@@ -20,9 +20,15 @@ export default function SwipePage() {
   const [drag, setDrag] = useState<{ dx: number; dy: number } | null>(null);
   const [fly, setFly] = useState<"left" | "right" | null>(null);
 
-  useEffect(() => {
-    fetch("/api/items").then((r) => r.json()).then(setCards);
-  }, []);
+  // 401 = 토큰은 있는데 계정이 없음(초기화·삭제) — 쿠키 지우고 로그인으로 (lib/session.ts pageUser와 같은 길)
+  const load = () => fetch("/api/items").then((r) => {
+    // 페이지가 아니라 쿠키를 지우는 API라 router.push가 아닌 전체 이동이어야 한다
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+    if (r.status === 401) { location.href = "/api/session/reset"; return; }
+    return r.json().then(setCards);
+  });
+
+  useEffect(() => { void load(); }, []);
 
   const mark = (id: string) =>
     fetch("/api/swipes", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ itemId: id }) }).catch(() => {});
@@ -128,7 +134,7 @@ export default function SwipePage() {
               <div className="mt-6 flex justify-center gap-2">
                 {cards.length > 0 && (
                   // 새로 불러오면 안 본 것 → 오래전에 본 것 순으로 다시 온다 (lib/items.ts swipeFeed)
-                  <button onClick={() => { setCards(null); setIdx(0); fetch("/api/items").then((r) => r.json()).then(setCards); }} className="btn-brand">다시 보기</button>
+                  <button onClick={() => { setCards(null); setIdx(0); void load(); }} className="btn-brand">다시 보기</button>
                 )}
                 <Link href="/items" className={cards.length > 0 ? "btn-ghost" : "btn-brand"}>전체 목록 보기</Link>
               </div>

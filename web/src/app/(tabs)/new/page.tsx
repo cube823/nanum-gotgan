@@ -1,11 +1,11 @@
 import { sql } from "@/lib/db";
-import { requireUser } from "@/lib/session";
+import { pageUser } from "@/lib/session";
 import { NewItemForm } from "./NewItemForm";
 import type { Category } from "@/lib/types";
 import Link from "next/link";
 
 export default async function NewItemPage() {
-  const u = await requireUser();
+  const u = await pageUser();
   if (u.orgStatus !== "verified") {
     return (
       <main className="flex-1 grid place-items-center p-8 text-center">

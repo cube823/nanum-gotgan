@@ -1,5 +1,5 @@
 import { sql } from "@/lib/db";
-import { requireUser } from "@/lib/session";
+import { pageUser } from "@/lib/session";
 import { OnboardingFlow } from "./OnboardingFlow";
 import type { Category } from "@/lib/types";
 
@@ -13,7 +13,7 @@ export default async function OnboardingPage() {
     WHERE risk_level <> 'red' ORDER BY sort_order`;
 
   // 새로고침하거나 중간에 나갔다 와도 채운 데까지는 건너뛴다.
-  const u = await requireUser();
+  const u = await pageUser();
 
   return (
     <OnboardingFlow

@@ -1,12 +1,12 @@
 import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
-import { requireUser } from "@/lib/session";
+import { pageUser } from "@/lib/session";
 import { ChatRoom } from "./ChatRoom";
 
 /** 기획 정의서 14 채팅 — 상단 상대(이름·기관 → 프로필), 물품 카드(물품명·신청 상태), 대화, 입력.
  *  예약·완료 버튼은 등록자에게만 (MVP §4.4). 두 사람뿐이라 발신자 이름·기관은 여기서 한 번에 넘긴다. */
 export default async function ChatPage({ params }: { params: Promise<{ transferId: string }> }) {
-  const u = await requireUser();
+  const u = await pageUser();
   const { transferId } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(transferId)) notFound();
   const [t] = await sql`

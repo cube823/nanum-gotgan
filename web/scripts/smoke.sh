@@ -288,6 +288,10 @@ expect "바뀐 수량"                "2" "$(api "$B" GET "/api/items/$OFF_ID" |
 expect "완료된 물품 수정 400"     "400" "$(api "$A" PATCH "/api/items/$ITEM" "$EDIT_OK" | status)"
 expect "수정 화면 200"            "200" "$(curl -s -o /dev/null -b "$A" -w '%{http_code}' "$BASE/items/$OFF_ID/edit")"
 expect "남의 물품 수정 화면 404"  "404" "$(nf "$B" "/items/$OFF_ID/edit")"
+# 사진 2장 이상이면 상세에 캐러셀(점·화살표)
+URL2=$(curl -s -b "$A" -F "file=@$J/p.png;type=image/png" "$BASE/api/uploads" | jget url)
+api "$A" PATCH "/api/items/$OFF_ID" "${EDIT_OK%]\}},\"$URL2\"]}" >/dev/null
+expect "사진 2장 상세 캐러셀"     "yes" "$(see "$B" "/items/$OFF_ID" "사진 2장 중 1번째")"
 # 메시지 > 등록한 물품: 대화 없는 내 게시물도 보인다
 expect "등록한 물품 탭에 대화 없는 게시물" "yes" "$(see "$A" "/messages?tab=mine" "네임펜 두 박스")"
 
@@ -336,6 +340,17 @@ expect "GET / 미로그인 → /login" "307" "$(curl -s -o /dev/null -w '%{http_
 expect "GET /logo.png 미로그인 200 (정적 파일은 게이트 밖)" "200" "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/logo.png")"
 expect "PWA manifest 미로그인 200" "200" "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/manifest.webmanifest")"
 expect "PWA manifest standalone" "standalone" "$(curl -s "$BASE/manifest.webmanifest" | jget display)"
+
+# 계정이 지워졌는데 쿠키가 남은 경우(시연 초기화) — 서버 오류 대신 쿠키를 지우고 /login으로
+LOCALDB=$(grep '^DATABASE_URL=' "$HERE/../.env.local" 2>/dev/null | cut -d= -f2-)
+case "$LOCALDB" in *localhost*|*127.0.0.1*)
+  G="$J/g"; login "$G" "g$SUF@dev.local" "지워질 계정"
+  psql "$LOCALDB" -qc "DELETE FROM users WHERE email = 'g$SUF@dev.local'" >/dev/null
+  expect "지워진 계정 페이지 → 쿠키 정리로" "/api/session/reset" "$(curl -s -o /dev/null -b "$G" -w '%{redirect_url}' "$BASE/onboarding" | sed -E 's#^https?://[^/]+##')"
+  expect "쿠키 정리 → /login"             "/login" "$(curl -s -o /dev/null -b "$G" -w '%{redirect_url}' "$BASE/api/session/reset" | sed -E 's#^https?://[^/]+##')"
+  expect "쿠키 정리가 세션 쿠키를 지움"   "yes" "$(curl -s -o /dev/null -b "$G" -D - "$BASE/api/session/reset" | grep -qi 'session-token=;' && echo yes || echo no)"
+  expect "지워진 계정 API 401"            "401" "$(api "$G" GET /api/items | status)";;
+esac
 
 echo
 echo "통과 $PASS · 실패 $FAIL"

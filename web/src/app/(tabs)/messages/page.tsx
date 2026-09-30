@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { sql } from "@/lib/db";
-import { requireUser } from "@/lib/session";
+import { pageUser } from "@/lib/session";
 import { TRANSFER_STATUS, chatTime } from "@/lib/labels";
 
 type Row = {
@@ -23,7 +23,7 @@ const EMPTY: Record<Tab, { icon: string; title: string; desc: string; cta: strin
 
 // 기획 정의서 메시지 목록 (61-110·111·112, 빈 상태 342-18·19·20). 행 하나 = 버튼 하나 → 채팅방.
 export default async function MessagesPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
-  const u = await requireUser();
+  const u = await pageUser();
   const q = (await searchParams).tab;
   const tab: Tab = q === "requested" || q === "mine" ? q : "all";
   const scope = tab === "requested" ? sql`t.requester_id = ${u.id}`

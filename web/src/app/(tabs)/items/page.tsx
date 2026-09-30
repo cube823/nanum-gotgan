@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { sql } from "@/lib/db";
-import { requireUser } from "@/lib/session";
+import { pageUser } from "@/lib/session";
 import { listFeed } from "@/lib/items";
 import { ItemGrid } from "@/components/ItemGrid";
 import type { Category } from "@/lib/types";
 
 // 화면 13. 재방문용 목록 — 스와이프와 달리 본 것도 다시 보인다.
 export default async function ItemsPage({ searchParams }: { searchParams: Promise<{ category?: string }> }) {
-  const u = await requireUser();
+  const u = await pageUser();
   const { category } = await searchParams;
   const [items, cats] = await Promise.all([
     listFeed(u.orgId, category || null),

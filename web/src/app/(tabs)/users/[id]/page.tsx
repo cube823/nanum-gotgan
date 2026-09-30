@@ -1,13 +1,13 @@
 import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
-import { requireUser } from "@/lib/session";
+import { pageUser } from "@/lib/session";
 import { ymd } from "@/lib/labels";
 import { BackButton } from "./BackButton";
 
 /** 상대 프로필 — 기획 정의서 11 "등록자 정보 카드 터치".
  *  이름·기관·가입일·거래 횟수만. 전화번호·이메일은 보이지 않는다 (연락은 채팅으로). */
 export default async function UserPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireUser();
+  await pageUser();
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();   // uuid 아니면 SQL 에러 대신 404
 

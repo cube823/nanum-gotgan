@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { requireUser } from "@/lib/session";
+import { pageUser } from "@/lib/session";
 import { PROFILE_LISTS, profileList, type ProfileList } from "@/lib/items";
 import { SubPage } from "../SubPage";
 import { ItemRow } from "../ItemRow";
@@ -15,7 +15,7 @@ const EMPTY: Record<ProfileList, string> = {
 
 // 기획 정의서 106-294 북마크 · 295 신청 · 296 수령. 우리 기관 메뉴 3개도 같은 카드로.
 export default async function ProfileListPage({ params }: { params: Promise<{ list: string }> }) {
-  const u = await requireUser();
+  const u = await pageUser();
   const { list } = await params;
   if (!(list in PROFILE_LISTS)) notFound();
   const kind = list as ProfileList;

@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { sql } from "@/lib/db";
-import { requireUser } from "@/lib/session";
+import { pageUser } from "@/lib/session";
 import { getItem } from "@/lib/items";
 import type { Category, Condition } from "@/lib/types";
 import { NewItemForm } from "@/app/(tabs)/new/NewItemForm";
@@ -8,7 +8,7 @@ import { NewItemForm } from "@/app/(tabs)/new/NewItemForm";
 /** 게시물 수정 (QA 1차) — 등록 화면을 저장된 값으로 채워 입력 단계에서 연다. 등록자만, 나눔이 끝나기 전까지.
  *  권한은 PATCH /api/items/[id] action=update가 다시 본다 — 여기서 막는 건 화면일 뿐. */
 export default async function EditItemPage({ params }: { params: Promise<{ id: string }> }) {
-  const u = await requireUser();
+  const u = await pageUser();
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
   const item = await getItem(id);

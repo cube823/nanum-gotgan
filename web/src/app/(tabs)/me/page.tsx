@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { sql } from "@/lib/db";
-import { requireUser } from "@/lib/session";
+import { pageUser } from "@/lib/session";
 import { district } from "@/lib/labels";
 import { Avatar } from "./Avatar";
 import { SignOutButton } from "./SignOutButton";
@@ -28,7 +28,7 @@ function Chevron() {
 
 // 기획 정의서 106-291 내 정보. 프로필 카드 → 수정, 북마크·신청·수령, 우리 기관 메뉴, 로그아웃.
 export default async function MePage() {
-  const u = await requireUser();
+  const u = await pageUser();
   const [org] = u.orgId ? await sql`SELECT name, address FROM organizations WHERE id = ${u.orgId}` : [];
   const where = [org?.name ?? "소속 없음", district(org?.address)].filter(Boolean).join(" · ");
 
